@@ -1,3 +1,5 @@
+%global debug_package %{nil}
+
 Name:           claude-code
 Version:        2.1.92
 Release:        2%{?dist}

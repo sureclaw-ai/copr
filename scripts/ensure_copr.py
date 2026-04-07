@@ -30,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--instructions")
     parser.add_argument("--runtime-dependency-project", action="append", default=[])
     parser.add_argument("--arch", action="append", default=[])
+    parser.add_argument("--exclude-distro", action="append", default=[])
     parser.add_argument("--package")
     parser.add_argument("--clone-url")
     parser.add_argument("--commit")
@@ -55,17 +56,28 @@ def effective_arches(arches: list[str]) -> list[str]:
     return sorted(set(selected))
 
 
-def list_chroots(arches: list[str]) -> list[str]:
+def list_chroots(arches: list[str], excluded_distros: list[str]) -> list[str]:
     selected_arches = set(effective_arches(arches))
+    excluded_distro_set = set(excluded_distros)
     result = run(["copr-cli", "list-chroots"])
     chroots = []
     for line in result.stdout.splitlines():
         candidate = line.strip()
         match = CHROOT_RE.fullmatch(candidate)
-        if match and match.group(2) in selected_arches:
-            chroots.append(candidate)
+        if not match:
+            continue
+        distro, arch = match.groups()
+        if arch not in selected_arches or distro in excluded_distro_set:
+            continue
+        chroots.append(candidate)
     if not chroots:
         arches_text = ", ".join(sorted(selected_arches))
+        if excluded_distro_set:
+            excluded_text = ", ".join(sorted(excluded_distro_set))
+            raise RuntimeError(
+                "no chroots were returned by copr-cli for arches: "
+                f"{arches_text} after excluding distros: {excluded_text}"
+            )
         raise RuntimeError(f"no chroots were returned by copr-cli for arches: {arches_text}")
     return sorted(set(chroots))
 
@@ -141,7 +153,7 @@ def ensure_package(args: argparse.Namespace, ref: str) -> None:
 def main() -> int:
     args = parse_args()
     ref = project_ref(args.owner, args.project)
-    chroots = list_chroots(args.arch)
+    chroots = list_chroots(args.arch, args.exclude_distro)
     ensure_project(args, ref, chroots)
     if args.package:
         ensure_package(args, ref)

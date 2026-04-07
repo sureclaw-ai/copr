@@ -4,6 +4,11 @@
     "aarch64",
     "x86_64"
   ],
+  "chroot_exclude_distros": [
+    "epel-7",
+    "mageia-cauldron",
+    "rhel-7"
+  ],
   "packages": [
     {
       "chroot_arches": [

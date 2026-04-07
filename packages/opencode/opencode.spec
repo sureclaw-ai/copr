@@ -1,3 +1,5 @@
+%global debug_package %{nil}
+
 Name:           opencode
 Version:        1.3.17
 Release:        1%{?dist}

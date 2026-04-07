@@ -55,15 +55,15 @@ The workflow runs daily at `00:15` UTC and can also be started manually. Use the
 4. Checks the latest npm `latest` dist-tag for `@anthropic-ai/claude-code`.
 5. Uses `uv` to install the pinned Python toolchain and workflow dependencies from `uv.lock`.
 6. Checks all tracked upstream sources concurrently, updates any package spec whose upstream version changed, and pushes that commit back to this repository.
-7. Ensures each canonical package COPR project exists, enables all currently available COPR chroots for that package's configured architectures, and turns on `follow-fedora-branching`.
+7. Ensures each canonical package COPR project exists, enables all currently available COPR chroots for that package's configured architectures except excluded distros, and turns on `follow-fedora-branching`.
 8. Ensures every package source points at this repository and uses the `make_srpm` method from its package subdirectory.
 9. Ensures the umbrella COPR project `ai` exists and carries runtime dependencies on the canonical package COPRs.
 10. Starts COPR builds only for canonical package projects whose versions changed, or for all canonical package projects when the manual workflow is run with `force_build=true`.
 
 ## Notes
 
-- The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to chroots whose architecture appears in `packages.json`.
-- All tracked packages currently target `aarch64` and `x86_64`. That includes Fedora plus any EPEL, CentOS Stream, or openSUSE chroots COPR currently exposes for those architectures.
+- The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to chroots whose architecture appears in `packages.json`, then filtered again by excluded distro IDs from `packages.json`.
+- All tracked packages currently target `aarch64` and `x86_64`, excluding `epel-7`, `rhel-7`, and `mageia-cauldron`.
 - `gogcli` uses vendored Go modules.
 - `codex` uses the upstream Linux musl release artifacts and depends on the Fedora `ripgrep` package instead of bundling `rg`.
 - `opencode` uses the upstream Linux release artifacts and packages the `x86_64` baseline build so one RPM works on a wider range of Fedora systems.
