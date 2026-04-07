@@ -1,20 +1,21 @@
 {
   "umbrella_project": "ai",
-  "umbrella_chroot_arches": [
-    "aarch64",
-    "x86_64"
-  ],
+  "umbrella_chroot_arches": ["aarch64", "x86_64"],
   "chroot_exclude_distros": [
     "epel-7",
-    "mageia-cauldron",
-    "rhel-7"
+    "epel-8",
+    "mageia",
+    "rhel-7",
+    "rhel-8",
+    "centos-stream-8",
+    "centos-stream+epel-next-8",
+    "custom",
+    "almalinux-kitten-10",
+    "alma-kitten+epel-10"
   ],
   "packages": [
     {
-      "chroot_arches": [
-        "aarch64",
-        "x86_64"
-      ],
+      "chroot_arches": ["aarch64", "x86_64"],
       "name": "gogcli",
       "project": "gogcli",
       "subdir": "packages/gogcli",
@@ -23,10 +24,7 @@
       "tag_prefix": "v"
     },
     {
-      "chroot_arches": [
-        "aarch64",
-        "x86_64"
-      ],
+      "chroot_arches": ["aarch64", "x86_64"],
       "name": "codex",
       "project": "codex",
       "subdir": "packages/codex",
@@ -35,10 +33,7 @@
       "tag_prefix": "rust-v"
     },
     {
-      "chroot_arches": [
-        "aarch64",
-        "x86_64"
-      ],
+      "chroot_arches": ["aarch64", "x86_64"],
       "name": "opencode",
       "project": "opencode",
       "subdir": "packages/opencode",
@@ -47,10 +42,7 @@
       "tag_prefix": "v"
     },
     {
-      "chroot_arches": [
-        "aarch64",
-        "x86_64"
-      ],
+      "chroot_arches": ["aarch64", "x86_64"],
       "name": "claude-code",
       "project": "claude-code",
       "subdir": "packages/claude-code",

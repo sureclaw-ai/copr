@@ -62,8 +62,8 @@ The workflow runs daily at `00:15` UTC and can also be started manually. Use the
 
 ## Notes
 
-- The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to chroots whose architecture appears in `packages.json`, then filtered again by excluded distro IDs from `packages.json`.
-- All tracked packages currently target `aarch64` and `x86_64`, excluding `epel-7`, `rhel-7`, and `mageia-cauldron`.
+- The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to chroots whose architecture appears in `packages.json`, then filtered again by excluded distro IDs or distro prefixes from `packages.json`.
+- All tracked packages currently target `aarch64` and `x86_64`, excluding `alma-kitten+epel-10-*`, `almalinux-kitten-10-*`, `centos-stream+epel-next-8-*`, `centos-stream-8`, `custom-*`, `epel-7`, `mageia-*`, `rhel-7`, and `rhel-8`.
 - `gogcli` uses vendored Go modules.
 - `codex` uses the upstream Linux musl release artifacts and depends on the Fedora `ripgrep` package instead of bundling `rg`.
 - `opencode` uses the upstream Linux release artifacts and packages the `x86_64` baseline build so one RPM works on a wider range of Fedora systems.

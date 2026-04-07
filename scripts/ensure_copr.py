@@ -56,6 +56,13 @@ def effective_arches(arches: list[str]) -> list[str]:
     return sorted(set(selected))
 
 
+def distro_is_excluded(distro: str, excluded_distros: list[str]) -> bool:
+    for excluded in excluded_distros:
+        if distro == excluded or distro.startswith(f"{excluded}-"):
+            return True
+    return False
+
+
 def list_chroots(arches: list[str], excluded_distros: list[str]) -> list[str]:
     selected_arches = set(effective_arches(arches))
     excluded_distro_set = set(excluded_distros)
@@ -67,7 +74,7 @@ def list_chroots(arches: list[str], excluded_distros: list[str]) -> list[str]:
         if not match:
             continue
         distro, arch = match.groups()
-        if arch not in selected_arches or distro in excluded_distro_set:
+        if arch not in selected_arches or distro_is_excluded(distro, excluded_distros):
             continue
         chroots.append(candidate)
     if not chroots:
