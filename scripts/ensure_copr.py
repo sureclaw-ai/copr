@@ -7,7 +7,8 @@ import re
 import subprocess
 import sys
 
-FEDORA_CHROOT_RE = re.compile(r"^fedora-(\d+|rawhide)-(x86_64|aarch64)$")
+DEFAULT_ARCHES = ("aarch64", "x86_64")
+CHROOT_RE = re.compile(r"^(.+)-([a-z0-9_]+)$")
 
 
 def run(command: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -25,36 +26,48 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--owner", required=True)
     parser.add_argument("--project", required=True)
-    parser.add_argument("--package", required=True)
-    parser.add_argument("--clone-url", required=True)
-    parser.add_argument("--commit", required=True)
-    parser.add_argument("--spec", required=True)
+    parser.add_argument("--description")
+    parser.add_argument("--instructions")
+    parser.add_argument("--runtime-dependency-project", action="append", default=[])
+    parser.add_argument("--arch", action="append", default=[])
+    parser.add_argument("--package")
+    parser.add_argument("--clone-url")
+    parser.add_argument("--commit")
+    parser.add_argument("--subdir", default=".")
+    parser.add_argument("--spec")
     parser.add_argument("--timeout", type=int, default=7200)
     parser.add_argument("--max-builds", type=int, default=10)
-    return parser.parse_args()
+    args = parser.parse_args()
+    package_fields = [args.clone_url, args.commit, args.spec]
+    if args.package and not all(package_fields):
+        parser.error("--package requires --clone-url, --commit, and --spec")
+    if not args.package and any(package_fields):
+        parser.error("--clone-url, --commit, and --spec require --package")
+    return args
 
 
 def project_ref(owner: str, project: str) -> str:
     return f"{owner}/{project}"
 
 
-def list_fedora_chroots() -> list[str]:
+def effective_arches(arches: list[str]) -> list[str]:
+    selected = arches or list(DEFAULT_ARCHES)
+    return sorted(set(selected))
+
+
+def list_chroots(arches: list[str]) -> list[str]:
+    selected_arches = set(effective_arches(arches))
     result = run(["copr-cli", "list-chroots"])
     chroots = []
     for line in result.stdout.splitlines():
         candidate = line.strip()
-        if FEDORA_CHROOT_RE.fullmatch(candidate):
+        match = CHROOT_RE.fullmatch(candidate)
+        if match and match.group(2) in selected_arches:
             chroots.append(candidate)
     if not chroots:
-        raise RuntimeError("no Fedora x86_64/aarch64 chroots were returned by copr-cli")
-    return sorted(chroots, key=chroot_sort_key)
-
-
-def chroot_sort_key(chroot: str) -> tuple[int, str]:
-    version, arch = chroot.split("-")[1], chroot.split("-")[2]
-    if version == "rawhide":
-        return (10_000, arch)
-    return (int(version), arch)
+        arches_text = ", ".join(sorted(selected_arches))
+        raise RuntimeError(f"no chroots were returned by copr-cli for arches: {arches_text}")
+    return sorted(set(chroots))
 
 
 def project_exists(ref: str) -> bool:
@@ -71,9 +84,14 @@ def package_exists(ref: str, package: str) -> bool:
     )
 
 
-def ensure_project(ref: str, chroots: list[str]) -> None:
-    description = "Automatic COPR packaging for steipete/gogcli."
-    instructions = f"dnf copr enable {ref}\ndnf install gogcli"
+def runtime_dependency_refs(owner: str, projects: list[str]) -> list[str]:
+    return [f"copr://{owner}/{project}" for project in projects]
+
+
+def ensure_project(args: argparse.Namespace, ref: str, chroots: list[str]) -> None:
+    description = args.description or "Automatic COPR packaging for tracked upstream CLI tools."
+    instructions = args.instructions or f"dnf copr enable {ref}\ndnf install <package-name>"
+    runtime_dependencies = runtime_dependency_refs(args.owner, args.runtime_dependency_project) if args.runtime_dependency_project else []
     base_command = [
         "copr-cli",
         "modify" if project_exists(ref) else "create",
@@ -85,6 +103,8 @@ def ensure_project(ref: str, chroots: list[str]) -> None:
         "--follow-fedora-branching",
         "on",
     ]
+    for runtime_dependency in runtime_dependencies:
+        base_command.extend(["--runtime-repo-dependency", runtime_dependency])
     for chroot in chroots:
         base_command.extend(["--chroot", chroot])
     run(base_command)
@@ -103,7 +123,7 @@ def ensure_package(args: argparse.Namespace, ref: str) -> None:
         "--commit",
         args.commit,
         "--subdir",
-        ".",
+        args.subdir,
         "--spec",
         args.spec,
         "--method",
@@ -121,10 +141,13 @@ def ensure_package(args: argparse.Namespace, ref: str) -> None:
 def main() -> int:
     args = parse_args()
     ref = project_ref(args.owner, args.project)
-    chroots = list_fedora_chroots()
-    ensure_project(ref, chroots)
-    ensure_package(args, ref)
-    print(f"synced {ref} for {args.package} across {len(chroots)} Fedora chroots")
+    chroots = list_chroots(args.arch)
+    ensure_project(args, ref, chroots)
+    if args.package:
+        ensure_package(args, ref)
+        print(f"synced {ref} for {args.package} across {len(chroots)} chroots")
+    else:
+        print(f"synced project {ref} across {len(chroots)} chroots")
     return 0
 
 

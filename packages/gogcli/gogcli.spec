@@ -46,4 +46,3 @@ install -Dpm0755 gog %{buildroot}%{_bindir}/gog
 %changelog
 * Tue Apr 07 2026 Codex Automation <noreply@users.noreply.github.com> - 0.12.0-1
 - Initial COPR packaging for gogcli
-

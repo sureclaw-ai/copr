@@ -1,0 +1,44 @@
+{
+  "umbrella_project": "ai",
+  "umbrella_chroot_arches": [
+    "aarch64",
+    "x86_64"
+  ],
+  "packages": [
+    {
+      "chroot_arches": [
+        "aarch64",
+        "x86_64"
+      ],
+      "name": "gogcli",
+      "project": "gogcli",
+      "subdir": "packages/gogcli",
+      "spec": "gogcli.spec",
+      "upstream_url": "https://github.com/steipete/gogcli.git",
+      "tag_prefix": "v"
+    },
+    {
+      "chroot_arches": [
+        "aarch64",
+        "x86_64"
+      ],
+      "name": "codex",
+      "project": "codex",
+      "subdir": "packages/codex",
+      "spec": "codex.spec",
+      "upstream_url": "https://github.com/openai/codex.git",
+      "tag_prefix": "rust-v"
+    },
+    {
+      "chroot_arches": [
+        "aarch64",
+        "x86_64"
+      ],
+      "name": "claude-code",
+      "project": "claude-code",
+      "subdir": "packages/claude-code",
+      "spec": "claude-code.spec",
+      "npm_package": "@anthropic-ai/claude-code"
+    }
+  ]
+}

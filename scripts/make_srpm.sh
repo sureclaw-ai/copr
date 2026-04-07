@@ -11,6 +11,7 @@ spec=""
 outdir=""
 package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/steipete/gogcli.git}"
+upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -49,7 +50,7 @@ if [[ -z "$version" ]]; then
   exit 1
 fi
 
-tag="v${version}"
+tag="${upstream_tag_prefix}${version}"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
 

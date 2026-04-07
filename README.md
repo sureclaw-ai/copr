@@ -1,14 +1,23 @@
-# gogcli COPR packaging
+# COPR packaging
 
-This repository packages [`steipete/gogcli`](https://github.com/steipete/gogcli) for Fedora COPR.
+This repository packages upstream CLI tools for COPR.
 
-The source RPM is generated in COPR's SCM build phase via `.copr/Makefile`, which vendors Go modules before the actual RPM build runs. That keeps the RPM build offline while avoiding committed source tarballs in this repo.
+Each package lives in its own subdirectory under `packages/` and is built in its own canonical COPR project. An umbrella COPR named `ai` is maintained separately and only enables those canonical package repos via runtime dependencies, so it does not rebuild the same RPMs.
+
+## Packages
+
+- `gogcli`: source-built from upstream git tags with vendored Go modules
+- `codex`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`, with a runtime dependency on `ripgrep`
+- `claude-code`: repackaged from the `@anthropic-ai/claude-code` npm tarball for `x86_64` and `aarch64`, with a Node.js runtime wrapper for the upstream `claude` command
+- `ai`: umbrella COPR project that enables the canonical package COPRs together
 
 ## What is included
 
-- `gogcli.spec`: the RPM spec tracked in git
-- `.copr/Makefile`: COPR SCM entrypoint for `make_srpm`
-- `scripts/make_srpm.sh`: clones the upstream tag, vendors modules, and emits the SRPM
+- `packages/<name>/`: per-package spec and `.copr/Makefile`
+- `packages.json`: package list used by the updater workflow
+- `scripts/make_srpm.sh`: clones an upstream git tag, vendors Go modules, and emits an SRPM
+- `scripts/make_binary_release_srpm.sh`: downloads release artifacts and emits an SRPM
+- `scripts/make_npm_srpm.sh`: downloads an npm package tarball and emits an SRPM
 - `scripts/ensure_copr.py`: creates or updates the COPR project and package source definition
 - `.github/workflows/update-copr.yml`: weekly upstream check plus optional manual rebuild
 
@@ -17,7 +26,6 @@ The source RPM is generated in COPR's SCM build phase via `.copr/Makefile`, whic
 Add these repository variables:
 
 - `COPR_OWNER`: COPR owner, for example `yourname` or `@your-group`
-- `COPR_PROJECT`: COPR project name
 - `COPR_URL` (optional): defaults to `https://copr.fedorainfracloud.org`
 
 Add these repository secrets:
@@ -31,14 +39,20 @@ The workflow runs every Monday at `00:15` UTC and can also be started manually. 
 ## How the workflow behaves
 
 1. Checks the latest upstream `v*` tag from `https://github.com/steipete/gogcli.git`.
-2. Updates `gogcli.spec` when the upstream version changes and pushes that commit back to this repository.
-3. Ensures the COPR project exists, enables all currently available Fedora `x86_64` and `aarch64` chroots, and turns on `follow-fedora-branching`.
-4. Ensures the COPR package source points at this repository and uses the `make_srpm` method.
-5. Starts a COPR build when a new upstream version was found, or when the manual workflow is run with `force_build=true`.
+2. Checks the latest upstream `rust-v*` tag from `https://github.com/openai/codex.git`.
+3. Checks the latest npm `latest` dist-tag for `@anthropic-ai/claude-code`.
+4. Updates any package spec whose upstream version changed and pushes that commit back to this repository.
+5. Ensures each canonical package COPR project exists, enables all currently available COPR chroots for that package's configured architectures, and turns on `follow-fedora-branching`.
+6. Ensures every package source points at this repository and uses the `make_srpm` method from its package subdirectory.
+7. Ensures the umbrella COPR project `ai` exists and carries runtime dependencies on the canonical package COPRs.
+8. Starts COPR builds only for canonical package projects whose versions changed, or for all canonical package projects when the manual workflow is run with `force_build=true`.
 
 ## Notes
 
-- The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to `fedora-*-(x86_64|aarch64)`.
-- The spec is constrained to `ExclusiveArch: aarch64 x86_64`.
-- The build uses vendored Go modules and does not depend on upstream release artifacts.
-
+- The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to chroots whose architecture appears in `packages.json`.
+- All tracked packages currently target `aarch64` and `x86_64`. That includes Fedora plus any EPEL, CentOS Stream, or openSUSE chroots COPR currently exposes for those architectures.
+- `gogcli` uses vendored Go modules.
+- `codex` uses the upstream Linux musl release artifacts and depends on the Fedora `ripgrep` package instead of bundling `rg`.
+- `claude-code` uses the upstream npm tarball and installs the upstream `claude` command name.
+- `claude-code` is proprietary software distributed under Anthropic's legal terms rather than an open-source license; review those terms before publishing it in a public COPR.
+- The umbrella `ai` COPR does not rebuild packages; it only points users at the canonical per-package repos through `copr://...` runtime dependencies.

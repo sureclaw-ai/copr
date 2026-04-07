@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: gogcli-copr-update
+  group: copr-packages-update
   cancel-in-progress: false
 
 jobs:
@@ -36,13 +36,12 @@ jobs:
       - name: Validate COPR configuration
         env:
           COPR_OWNER: ${{ vars.COPR_OWNER }}
-          COPR_PROJECT: ${{ vars.COPR_PROJECT }}
           COPR_LOGIN: ${{ secrets.COPR_LOGIN }}
           COPR_USERNAME: ${{ secrets.COPR_USERNAME }}
           COPR_TOKEN: ${{ secrets.COPR_TOKEN }}
         run: |
           set -euo pipefail
-          for key in COPR_OWNER COPR_PROJECT COPR_LOGIN COPR_USERNAME COPR_TOKEN; do
+          for key in COPR_OWNER COPR_LOGIN COPR_USERNAME COPR_TOKEN; do
             if [ -z "${!key:-}" ]; then
               echo "Missing required GitHub variable/secret: $key" >&2
               exit 1
@@ -50,22 +49,52 @@ jobs:
           done
 
       - name: Detect upstream version
-        id: upstream
         run: |
-          python3 scripts/check_upstream.py \
-            --spec gogcli.spec \
-            --upstream-url https://github.com/steipete/gogcli.git \
-            --update \
-            --github-output "$GITHUB_OUTPUT"
+          set -euo pipefail
+          changed_packages=()
+          while IFS= read -r package_json; do
+            name="$(jq -r '.name' <<<"$package_json")"
+            subdir="$(jq -r '.subdir' <<<"$package_json")"
+            spec="$(jq -r '.spec' <<<"$package_json")"
+            upstream_url="$(jq -r '.upstream_url // empty' <<<"$package_json")"
+            npm_package="$(jq -r '.npm_package // empty' <<<"$package_json")"
+            tag_prefix="$(jq -r '.tag_prefix // "v"' <<<"$package_json")"
+
+            output_file="$(mktemp)"
+            check_args=(
+              --spec "${subdir}/${spec}"
+              --update
+              --github-output "${output_file}"
+            )
+            if [[ -n "$npm_package" ]]; then
+              check_args+=(--npm-package "$npm_package")
+            else
+              check_args+=(--upstream-url "${upstream_url}" --tag-prefix "${tag_prefix}")
+            fi
+            python3 scripts/check_upstream.py "${check_args[@]}"
+
+            if [[ "$(sed -n 's/^changed=//p' "${output_file}")" == "true" ]]; then
+              changed_packages+=("${name}")
+            fi
+          done < <(jq -c '.packages[]' packages.json)
+
+          if ((${#changed_packages[@]} > 0)); then
+            printf 'changed_any=true\n' >>"$GITHUB_OUTPUT"
+            printf 'changed_packages=%s\n' "$(IFS=,; echo "${changed_packages[*]}")" >>"$GITHUB_OUTPUT"
+          else
+            printf 'changed_any=false\n' >>"$GITHUB_OUTPUT"
+            printf 'changed_packages=\n' >>"$GITHUB_OUTPUT"
+          fi
+        id: upstream
 
       - name: Commit packaged version bump
-        if: steps.upstream.outputs.changed == 'true'
+        if: steps.upstream.outputs.changed_any == 'true'
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add gogcli.spec
-          git commit -m "Update gogcli to v${{ steps.upstream.outputs.latest_version }}"
+          git add packages/*/*.spec
+          git commit -m "Update packaged versions: ${{ steps.upstream.outputs.changed_packages }}"
           git push
 
       - name: Install COPR CLI
@@ -93,21 +122,58 @@ jobs:
       - name: Sync COPR project and package settings
         env:
           COPR_OWNER: ${{ vars.COPR_OWNER }}
-          COPR_PROJECT: ${{ vars.COPR_PROJECT }}
-        run: |
-          python3 scripts/ensure_copr.py \
-            --owner "$COPR_OWNER" \
-            --project "$COPR_PROJECT" \
-            --package gogcli \
-            --clone-url "${{ github.server_url }}/${{ github.repository }}.git" \
-            --commit "${{ github.ref_name }}" \
-            --spec gogcli.spec
-
-      - name: Trigger COPR build
-        if: steps.upstream.outputs.changed == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force_build)
-        env:
-          COPR_OWNER: ${{ vars.COPR_OWNER }}
-          COPR_PROJECT: ${{ vars.COPR_PROJECT }}
         run: |
           set -euo pipefail
-          copr-cli build-package "${COPR_OWNER}/${COPR_PROJECT}" --name gogcli
+          while IFS= read -r package_json; do
+            name="$(jq -r '.name' <<<"$package_json")"
+            project="$(jq -r '.project' <<<"$package_json")"
+            package_args=(
+              --owner "$COPR_OWNER" \
+              --project "$project" \
+              --description "Canonical COPR build for ${name}." \
+              --instructions "$(printf 'dnf copr enable %s/%s\ndnf install %s' "$COPR_OWNER" "$project" "$name")" \
+              --package "$name" \
+              --clone-url "${{ github.server_url }}/${{ github.repository }}.git" \
+              --commit "${{ github.ref_name }}" \
+              --subdir "$(jq -r '.subdir' <<<"$package_json")" \
+              --spec "$(jq -r '.spec' <<<"$package_json")"
+            )
+            while IFS= read -r arch; do
+              package_args+=(--arch "$arch")
+            done < <(jq -r '.chroot_arches[]?' <<<"$package_json")
+            python3 scripts/ensure_copr.py "${package_args[@]}"
+          done < <(jq -c '.packages[]' packages.json)
+
+          umbrella_project="$(jq -r '.umbrella_project' packages.json)"
+          umbrella_args=(
+            --owner "$COPR_OWNER"
+            --project "$umbrella_project"
+            --description "Umbrella COPR for AI-related CLI tools."
+            --instructions "$(printf 'dnf copr enable %s/%s\ndnf install <package-name>' "$COPR_OWNER" "$umbrella_project")"
+          )
+          while IFS= read -r package_project; do
+            umbrella_args+=(--runtime-dependency-project "$package_project")
+          done < <(jq -r '.packages[].project' packages.json)
+          while IFS= read -r arch; do
+            umbrella_args+=(--arch "$arch")
+          done < <(jq -r '.umbrella_chroot_arches[]?' packages.json)
+          python3 scripts/ensure_copr.py "${umbrella_args[@]}"
+
+      - name: Trigger COPR builds
+        if: steps.upstream.outputs.changed_any == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force_build)
+        env:
+          COPR_OWNER: ${{ vars.COPR_OWNER }}
+        run: |
+          set -euo pipefail
+          changed_packages=",${{ steps.upstream.outputs.changed_packages }},"
+          while IFS= read -r package_json; do
+            name="$(jq -r '.name' <<<"$package_json")"
+            project="$(jq -r '.project' <<<"$package_json")"
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.force_build }}" == "true" ]]; then
+              copr-cli build-package "${COPR_OWNER}/${project}" --name "${name}"
+              continue
+            fi
+            if [[ "$changed_packages" == *",${name},"* ]]; then
+              copr-cli build-package "${COPR_OWNER}/${project}" --name "${name}"
+            fi
+          done < <(jq -c '.packages[]' packages.json)
