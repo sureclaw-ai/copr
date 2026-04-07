@@ -1,5 +1,5 @@
 [project]
-name = "copr"
+name = "sureclaw-copr"
 version = "0.1.0"
 description = "Repo to manage packages we provide on copr"
 readme = "README.md"
