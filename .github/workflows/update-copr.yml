@@ -1,0 +1,113 @@
+name: Update COPR
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: Trigger a COPR build even when the packaged version is already current
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: "15 0 * * 1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gogcli-copr-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Validate COPR configuration
+        env:
+          COPR_OWNER: ${{ vars.COPR_OWNER }}
+          COPR_PROJECT: ${{ vars.COPR_PROJECT }}
+          COPR_LOGIN: ${{ secrets.COPR_LOGIN }}
+          COPR_USERNAME: ${{ secrets.COPR_USERNAME }}
+          COPR_TOKEN: ${{ secrets.COPR_TOKEN }}
+        run: |
+          set -euo pipefail
+          for key in COPR_OWNER COPR_PROJECT COPR_LOGIN COPR_USERNAME COPR_TOKEN; do
+            if [ -z "${!key:-}" ]; then
+              echo "Missing required GitHub variable/secret: $key" >&2
+              exit 1
+            fi
+          done
+
+      - name: Detect upstream version
+        id: upstream
+        run: |
+          python3 scripts/check_upstream.py \
+            --spec gogcli.spec \
+            --upstream-url https://github.com/steipete/gogcli.git \
+            --update \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Commit packaged version bump
+        if: steps.upstream.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gogcli.spec
+          git commit -m "Update gogcli to v${{ steps.upstream.outputs.latest_version }}"
+          git push
+
+      - name: Install COPR CLI
+        run: python3 -m pip install --user copr-cli==2.4
+
+      - name: Write COPR CLI configuration
+        env:
+          COPR_LOGIN: ${{ secrets.COPR_LOGIN }}
+          COPR_USERNAME: ${{ secrets.COPR_USERNAME }}
+          COPR_TOKEN: ${{ secrets.COPR_TOKEN }}
+          COPR_URL: ${{ vars.COPR_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.config"
+          {
+            printf '%s\n' '[copr-cli]'
+            printf 'login = %s\n' "${COPR_LOGIN}"
+            printf 'username = %s\n' "${COPR_USERNAME}"
+            printf 'token = %s\n' "${COPR_TOKEN}"
+            printf 'copr_url = %s\n' "${COPR_URL:-https://copr.fedorainfracloud.org}"
+          } >"$HOME/.config/copr"
+          chmod 0600 "$HOME/.config/copr"
+          echo "$HOME/.local/bin" >>"$GITHUB_PATH"
+
+      - name: Sync COPR project and package settings
+        env:
+          COPR_OWNER: ${{ vars.COPR_OWNER }}
+          COPR_PROJECT: ${{ vars.COPR_PROJECT }}
+        run: |
+          python3 scripts/ensure_copr.py \
+            --owner "$COPR_OWNER" \
+            --project "$COPR_PROJECT" \
+            --package gogcli \
+            --clone-url "${{ github.server_url }}/${{ github.repository }}.git" \
+            --commit "${{ github.ref_name }}" \
+            --spec gogcli.spec
+
+      - name: Trigger COPR build
+        if: steps.upstream.outputs.changed == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force_build)
+        env:
+          COPR_OWNER: ${{ vars.COPR_OWNER }}
+          COPR_PROJECT: ${{ vars.COPR_PROJECT }}
+        run: |
+          set -euo pipefail
+          copr-cli build-package "${COPR_OWNER}/${COPR_PROJECT}" --name gogcli
