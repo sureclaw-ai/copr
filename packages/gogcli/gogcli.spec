@@ -1,3 +1,5 @@
+%global debug_package %{nil}
+
 Name:           gogcli
 Version:        0.12.0
 Release:        1%{?dist}
