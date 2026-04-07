@@ -4,6 +4,15 @@ This repository packages upstream CLI tools for COPR.
 
 Each package lives in its own subdirectory under `packages/` and is built in its own canonical COPR project. An umbrella COPR named `ai` is maintained separately and only enables those canonical package repos via runtime dependencies, so it does not rebuild the same RPMs.
 
+## Build status
+
+| Package | Status |
+| --- | --- |
+| `gogcli` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/gogcli/package/gogcli/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/gogcli/package/gogcli/) |
+| `codex` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/codex/package/codex/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/codex/package/codex/) |
+| `opencode` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/opencode/package/opencode/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/opencode/package/opencode/) |
+| `claude-code` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/claude-code/package/claude-code/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/claude-code/package/claude-code/) |
+
 ## Packages
 
 - `gogcli`: source-built from upstream git tags with vendored Go modules

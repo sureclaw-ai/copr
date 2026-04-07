@@ -7,9 +7,10 @@ srpm:
 		echo "spec is required" >&2; \
 		exit 1; \
 	fi
-	@pkg_makefile="$$(dirname "$(spec)")/.copr/Makefile"; \
+	@pkg_dir="$$(dirname "$(spec)")"; \
+	pkg_makefile="$$pkg_dir/.copr/Makefile"; \
 	if [[ ! -f "$$pkg_makefile" ]]; then \
 		echo "missing package COPR makefile: $$pkg_makefile" >&2; \
 		exit 1; \
 	fi; \
-	exec $(MAKE) -f "$$pkg_makefile" srpm outdir="$(outdir)" spec="$(spec)"
+	exec $(MAKE) -C "$$pkg_dir" -f .copr/Makefile srpm outdir="$(outdir)" spec="$(spec)"
