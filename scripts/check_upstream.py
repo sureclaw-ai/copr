@@ -3,19 +3,40 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import datetime as dt
 import json
 import pathlib
 import re
-import subprocess
 import sys
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 
 VERSION_LINE_RE = re.compile(r"^(Version:\s+)(\S+)(\s*)$")
 RELEASE_LINE_RE = re.compile(r"^(Release:\s+)(\S+)(\s*)$")
 CHANGELOG_MARKER = "%changelog"
 CHANGELOG_AUTHOR = "Codex Automation <noreply@users.noreply.github.com>"
+DEFAULT_GIT_TIMEOUT = 60
+DEFAULT_HTTP_TIMEOUT = 30
+DEFAULT_JOBS = 8
+
+
+@dataclass(frozen=True)
+class PackageCheck:
+    name: str
+    spec: pathlib.Path
+    upstream_url: str | None = None
+    npm_package: str | None = None
+    tag_prefix: str = "v"
+
+
+@dataclass(frozen=True)
+class PackageResult:
+    name: str
+    current_version: str
+    latest_version: str
+    changed: bool
 
 
 def version_key(version: str) -> tuple[int, ...]:
@@ -30,16 +51,33 @@ def read_spec_version(spec_path: pathlib.Path) -> str:
     raise RuntimeError(f"could not find Version line in {spec_path}")
 
 
-def latest_upstream_version(upstream_url: str, tag_prefix: str) -> str:
-    tag_re = re.compile(rf"refs/tags/{re.escape(tag_prefix)}(\d+\.\d+\.\d+)$")
-    result = subprocess.run(
-        ["git", "ls-remote", "--tags", "--refs", upstream_url],
-        check=True,
-        text=True,
-        capture_output=True,
+async def git_ls_remote(upstream_url: str, *, timeout: int = DEFAULT_GIT_TIMEOUT) -> str:
+    process = await asyncio.create_subprocess_exec(
+        "git",
+        "ls-remote",
+        "--tags",
+        "--refs",
+        upstream_url,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
     )
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.communicate()
+        raise RuntimeError(f"git ls-remote timed out for {upstream_url}") from None
+    if process.returncode != 0:
+        details = stderr.decode().strip() or stdout.decode().strip()
+        raise RuntimeError(f"git ls-remote failed for {upstream_url}: {details}")
+    return stdout.decode()
+
+
+async def latest_upstream_version(upstream_url: str, tag_prefix: str) -> str:
+    tag_re = re.compile(rf"refs/tags/{re.escape(tag_prefix)}(\d+\.\d+\.\d+)$")
+    output = await git_ls_remote(upstream_url)
     versions = []
-    for line in result.stdout.splitlines():
+    for line in output.splitlines():
         _, ref = line.split("\t", 1)
         match = tag_re.search(ref)
         if match:
@@ -49,14 +87,45 @@ def latest_upstream_version(upstream_url: str, tag_prefix: str) -> str:
     return max(versions, key=version_key)
 
 
-def latest_npm_version(package_name: str) -> str:
+def fetch_npm_metadata(package_name: str, *, timeout: int = DEFAULT_HTTP_TIMEOUT) -> dict:
     registry_url = "https://registry.npmjs.org/" + urllib.parse.quote(package_name, safe="")
-    with urllib.request.urlopen(registry_url) as response:
-        metadata = json.load(response)
+    request = urllib.request.Request(
+        registry_url,
+        headers={"User-Agent": "gogcli-copr-check-upstream/1.0"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.load(response)
+
+
+async def latest_npm_version(package_name: str) -> str:
+    metadata = await asyncio.to_thread(fetch_npm_metadata, package_name)
     try:
         return metadata["dist-tags"]["latest"]
     except KeyError as exc:
         raise RuntimeError(f"could not determine latest npm dist-tag for {package_name}") from exc
+
+
+async def latest_version_for_package(package: PackageCheck) -> str:
+    if package.npm_package:
+        return await latest_npm_version(package.npm_package)
+    if package.upstream_url:
+        return await latest_upstream_version(package.upstream_url, package.tag_prefix)
+    raise RuntimeError(f"package {package.name} is missing an upstream source")
+
+
+async def latest_versions_for_packages(
+    packages: list[PackageCheck],
+    *,
+    jobs: int = DEFAULT_JOBS,
+) -> dict[str, str]:
+    semaphore = asyncio.Semaphore(max(1, jobs))
+
+    async def fetch(package: PackageCheck) -> tuple[str, str]:
+        async with semaphore:
+            return package.name, await latest_version_for_package(package)
+
+    pairs = await asyncio.gather(*(fetch(package) for package in packages))
+    return dict(pairs)
 
 
 def update_spec(spec_path: pathlib.Path, new_version: str) -> bool:
@@ -105,43 +174,137 @@ def write_github_output(output_path: pathlib.Path, values: dict[str, str]) -> No
             handle.write(f"{key}={value}\n")
 
 
+def load_packages(packages_json: pathlib.Path) -> list[PackageCheck]:
+    raw = json.loads(packages_json.read_text(encoding="utf-8"))
+    base_dir = packages_json.parent
+    packages = []
+    for item in raw["packages"]:
+        spec_path = base_dir / item["subdir"] / item["spec"]
+        package = PackageCheck(
+            name=item["name"],
+            spec=spec_path,
+            upstream_url=item.get("upstream_url"),
+            npm_package=item.get("npm_package"),
+            tag_prefix=item.get("tag_prefix", "v"),
+        )
+        if bool(package.upstream_url) == bool(package.npm_package):
+            raise RuntimeError(
+                f"package {package.name} must define exactly one of upstream_url or npm_package",
+            )
+        packages.append(package)
+    return packages
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--spec", required=True, type=pathlib.Path)
+    parser.add_argument("--spec", type=pathlib.Path)
+    parser.add_argument("--packages-json", type=pathlib.Path)
     parser.add_argument("--upstream-url")
     parser.add_argument("--npm-package")
     parser.add_argument("--tag-prefix", default="v")
     parser.add_argument("--update", action="store_true")
     parser.add_argument("--github-output", type=pathlib.Path)
+    parser.add_argument("--jobs", type=int, default=DEFAULT_JOBS)
     args = parser.parse_args()
-    if bool(args.upstream_url) == bool(args.npm_package):
-        parser.error("provide exactly one of --upstream-url or --npm-package")
+
+    if bool(args.spec) == bool(args.packages_json):
+        parser.error("provide exactly one of --spec or --packages-json")
+
+    if args.spec:
+        if bool(args.upstream_url) == bool(args.npm_package):
+            parser.error("provide exactly one of --upstream-url or --npm-package")
+    else:
+        disallowed = [args.upstream_url, args.npm_package]
+        if any(disallowed):
+            parser.error("--upstream-url and --npm-package are only valid with --spec")
+
+    if args.jobs < 1:
+        parser.error("--jobs must be at least 1")
     return args
+
+
+async def check_packages(packages: list[PackageCheck], *, update: bool, jobs: int) -> list[PackageResult]:
+    latest_versions = await latest_versions_for_packages(packages, jobs=jobs)
+    results = []
+    for package in packages:
+        current_version = read_spec_version(package.spec)
+        latest_version = latest_versions[package.name]
+        changed = version_key(latest_version) > version_key(current_version)
+        if update and changed:
+            changed = update_spec(package.spec, latest_version)
+        results.append(
+            PackageResult(
+                name=package.name,
+                current_version=current_version,
+                latest_version=latest_version,
+                changed=changed,
+            )
+        )
+    return results
+
+
+def print_single_result(result: PackageResult) -> None:
+    outputs = {
+        "current_version": result.current_version,
+        "latest_version": result.latest_version,
+        "changed": str(result.changed).lower(),
+    }
+    for key, value in outputs.items():
+        print(f"{key}={value}")
+
+
+def print_batch_results(results: list[PackageResult]) -> None:
+    for result in results:
+        print(
+            f"{result.name}: current_version={result.current_version} "
+            f"latest_version={result.latest_version} changed={str(result.changed).lower()}"
+        )
+    changed_packages = [result.name for result in results if result.changed]
+    print(f"changed_any={str(bool(changed_packages)).lower()}")
+    print(f"changed_packages={','.join(changed_packages)}")
 
 
 def main() -> int:
     args = parse_args()
-    current_version = read_spec_version(args.spec)
-    if args.npm_package:
-        latest_version = latest_npm_version(args.npm_package)
+    if args.spec:
+        packages = [
+            PackageCheck(
+                name=args.spec.stem,
+                spec=args.spec,
+                upstream_url=args.upstream_url,
+                npm_package=args.npm_package,
+                tag_prefix=args.tag_prefix,
+            )
+        ]
     else:
-        latest_version = latest_upstream_version(args.upstream_url, args.tag_prefix)
-    changed = version_key(latest_version) > version_key(current_version)
+        packages = load_packages(args.packages_json)
 
-    if args.update and changed:
-        changed = update_spec(args.spec, latest_version)
+    results = asyncio.run(check_packages(packages, update=args.update, jobs=args.jobs))
 
-    outputs = {
-        "current_version": current_version,
-        "latest_version": latest_version,
-        "changed": str(changed).lower(),
-    }
+    if args.spec:
+        result = results[0]
+        if args.github_output:
+            write_github_output(
+                args.github_output,
+                {
+                    "current_version": result.current_version,
+                    "latest_version": result.latest_version,
+                    "changed": str(result.changed).lower(),
+                },
+            )
+        print_single_result(result)
+        return 0
+
+    changed_packages = [result.name for result in results if result.changed]
     if args.github_output:
-        write_github_output(args.github_output, outputs)
-
-    for key, value in outputs.items():
-        print(f"{key}={value}")
-
+        write_github_output(
+            args.github_output,
+            {
+                "changed_any": str(bool(changed_packages)).lower(),
+                "changed_packages": ",".join(changed_packages),
+            },
+        )
+    print_batch_results(results)
     return 0
 
 

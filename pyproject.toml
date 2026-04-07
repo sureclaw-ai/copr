@@ -1,0 +1,12 @@
+[project]
+name = "copr"
+version = "0.1.0"
+description = "Repo to manage packages we provide on copr"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "copr-cli>=2.4",
+]
+
+[tool.uv]
+exclude-newer = "3 days"

@@ -34,6 +34,18 @@
         "aarch64",
         "x86_64"
       ],
+      "name": "opencode",
+      "project": "opencode",
+      "subdir": "packages/opencode",
+      "spec": "opencode.spec",
+      "upstream_url": "https://github.com/anomalyco/opencode.git",
+      "tag_prefix": "v"
+    },
+    {
+      "chroot_arches": [
+        "aarch64",
+        "x86_64"
+      ],
       "name": "claude-code",
       "project": "claude-code",
       "subdir": "packages/claude-code",
