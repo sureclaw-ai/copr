@@ -1,8 +1,8 @@
 %global debug_package %{nil}
 
 Name:           claude-code
-Version:        2.1.92
-Release:        2%{?dist}
+Version:        2.1.94
+Release:        1%{?dist}
 Summary:        Anthropic Claude Code terminal assistant
 
 License:        LicenseRef-Anthropic-Claude-Code
@@ -59,6 +59,9 @@ node ./cli.js --version >/dev/null
 %{_libexecdir}/%{name}/
 
 %changelog
+* Wed Apr 08 2026 Codex Automation <noreply@users.noreply.github.com> - 2.1.94-1
+- Update to v2.1.94
+
 * Tue Apr 07 2026 Codex Automation <noreply@users.noreply.github.com> - 2.1.92-2
 - Install the upstream `claude` command name only
 
