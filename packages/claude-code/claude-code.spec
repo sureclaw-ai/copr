@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           claude-code
-Version:        2.1.94
+Version:        2.1.97
 Release:        1%{?dist}
 Summary:        Anthropic Claude Code terminal assistant
 
@@ -59,6 +59,9 @@ node ./cli.js --version >/dev/null
 %{_libexecdir}/%{name}/
 
 %changelog
+* Thu Apr 09 2026 Codex Automation <noreply@users.noreply.github.com> - 2.1.97-1
+- Update to v2.1.97
+
 * Wed Apr 08 2026 Codex Automation <noreply@users.noreply.github.com> - 2.1.94-1
 - Update to v2.1.94
 
