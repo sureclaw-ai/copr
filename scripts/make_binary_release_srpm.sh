@@ -53,6 +53,20 @@ if [[ -z "$version" ]]; then
   exit 1
 fi
 
+source_filename_for_asset() {
+  local arch="$1"
+  local asset_name="$2"
+  local suffix=""
+  if [[ "$asset_name" == *.* ]]; then
+    suffix=".${asset_name#*.}"
+  fi
+  printf '%s-%s-%s%s' "$package_name" "$version" "$arch" "$suffix"
+}
+
+release_source_x86_64="${RELEASE_SOURCE_X86_64:-$(source_filename_for_asset x86_64 "$release_asset_x86_64")}"
+release_source_aarch64="${RELEASE_SOURCE_AARCH64:-$(source_filename_for_asset aarch64 "$release_asset_aarch64")}"
+docs_source="${DOCS_SOURCE:-${package_name}-${version}-docs.tar.gz}"
+
 tag="${upstream_tag_prefix}${version}"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
@@ -70,14 +84,14 @@ download_release_asset() {
     -o "${sources_dir}/${output_name}"
 }
 
-download_release_asset "${release_asset_x86_64}" "${package_name}-${version}-x86_64.tar.gz"
-download_release_asset "${release_asset_aarch64}" "${package_name}-${version}-aarch64.tar.gz"
+download_release_asset "${release_asset_x86_64}" "${release_source_x86_64}"
+download_release_asset "${release_asset_aarch64}" "${release_source_aarch64}"
 
 git clone --depth 1 --branch "${tag}" "${upstream_url}" "${srcdir}"
 for doc_file in ${doc_files}; do
   cp "${srcdir}/${doc_file}" "${docsdir}/"
 done
-tar -C "${docsdir}" -czf "${sources_dir}/${package_name}-${version}-docs.tar.gz" .
+tar -C "${docsdir}" -czf "${sources_dir}/${docs_source}" .
 
 rpmbuild -bs "$spec" \
   --define "_sourcedir ${sources_dir}" \

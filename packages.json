@@ -43,6 +43,15 @@
     },
     {
       "chroot_arches": ["aarch64", "x86_64"],
+      "name": "ollama",
+      "project": "ollama",
+      "subdir": "packages/ollama",
+      "spec": "ollama.spec",
+      "upstream_url": "https://github.com/ollama/ollama.git",
+      "tag_prefix": "v"
+    },
+    {
+      "chroot_arches": ["aarch64", "x86_64"],
       "name": "claude-code",
       "project": "claude-code",
       "subdir": "packages/claude-code",

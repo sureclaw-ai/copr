@@ -11,6 +11,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 | `gogcli` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/gogcli/package/gogcli/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/gogcli/package/gogcli/) |
 | `codex` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/codex/package/codex/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/codex/package/codex/) |
 | `opencode` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/opencode/package/opencode/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/opencode/package/opencode/) |
+| `ollama` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/ollama/package/ollama/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/ollama/package/ollama/) |
 | `claude-code` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/claude-code/package/claude-code/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/claude-code/package/claude-code/) |
 
 ## Packages
@@ -18,6 +19,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 - `gogcli`: source-built from upstream git tags with vendored Go modules
 - `codex`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`, with a runtime dependency on `ripgrep`
 - `opencode`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`
+- `ollama`: repackaged from upstream Linux release bundles for `x86_64` and `aarch64`
 - `claude-code`: repackaged from the `@anthropic-ai/claude-code` npm tarball for `x86_64` and `aarch64`, with a Node.js runtime wrapper for the upstream `claude` command
 - `ai`: umbrella COPR project that enables the canonical package COPRs together
 
@@ -52,13 +54,14 @@ The workflow runs daily at `00:15` UTC and can also be started manually. Use the
 1. Checks the latest upstream `v*` tag from `https://github.com/steipete/gogcli.git`.
 2. Checks the latest upstream `rust-v*` tag from `https://github.com/openai/codex.git`.
 3. Checks the latest upstream `v*` tag from `https://github.com/anomalyco/opencode.git`.
-4. Checks the latest npm `latest` dist-tag for `@anthropic-ai/claude-code`.
-5. Uses `uv` to install the pinned Python toolchain and workflow dependencies from `uv.lock`.
-6. Checks all tracked upstream sources concurrently, updates any package spec whose upstream version changed, and pushes that commit back to this repository.
-7. Ensures each canonical package COPR project exists, enables all currently available COPR chroots for that package's configured architectures except excluded distros, and turns on `follow-fedora-branching`.
-8. Ensures every package source points at this repository and uses the `make_srpm` method from its package subdirectory.
-9. Ensures the umbrella COPR project `ai` exists and carries runtime dependencies on the canonical package COPRs.
-10. Starts COPR builds only for canonical package projects whose versions changed, or for all canonical package projects when the manual workflow is run with `force_build=true`.
+4. Checks the latest upstream `v*` tag from `https://github.com/ollama/ollama.git`.
+5. Checks the latest npm `latest` dist-tag for `@anthropic-ai/claude-code`.
+6. Uses `uv` to install the pinned Python toolchain and workflow dependencies from `uv.lock`.
+7. Checks all tracked upstream sources concurrently, updates any package spec whose upstream version changed, and pushes that commit back to this repository.
+8. Ensures each canonical package COPR project exists, enables all currently available COPR chroots for that package's configured architectures except excluded distros, and turns on `follow-fedora-branching`.
+9. Ensures every package source points at this repository and uses the `make_srpm` method from its package subdirectory.
+10. Ensures the umbrella COPR project `ai` exists and carries runtime dependencies on the canonical package COPRs.
+11. Starts COPR builds only for canonical package projects whose versions changed, or for all canonical package projects when the manual workflow is run with `force_build=true`.
 
 ## Notes
 
@@ -67,6 +70,7 @@ The workflow runs daily at `00:15` UTC and can also be started manually. Use the
 - `gogcli` uses vendored Go modules.
 - `codex` uses the upstream Linux musl release artifacts and depends on the Fedora `ripgrep` package instead of bundling `rg`.
 - `opencode` uses the upstream Linux release artifacts and packages the `x86_64` baseline build so one RPM works on a wider range of Fedora systems.
+- `ollama` uses the upstream Linux release bundles and does not package the separate ROCm or JetPack add-on archives.
 - `claude-code` uses the upstream npm tarball and installs the upstream `claude` command name.
 - `claude-code` is proprietary software distributed under Anthropic's legal terms rather than an open-source license; review those terms before publishing it in a public COPR.
 - The umbrella `ai` COPR does not rebuild packages; it only points users at the canonical per-package repos through `copr://...` runtime dependencies.
