@@ -9,6 +9,7 @@ License:        LicenseRef-Anthropic-Claude-Code
 URL:            https://github.com/anthropics/claude-code
 Source0:        %{name}-%{version}.tgz
 
+BuildRequires:  nodejs >= 18
 Requires:       nodejs >= 18
 ExclusiveArch:  aarch64 x86_64
 
