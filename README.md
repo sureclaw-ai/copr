@@ -68,8 +68,8 @@ The workflow runs daily at `00:15` UTC, on pushes to `main`, and can also be sta
 
 ## Notes
 
-- The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to chroots whose architecture appears in `packages.json`, then filtered again by excluded distro IDs or distro prefixes from `packages.json`.
-- All tracked packages currently target `aarch64` and `x86_64`, excluding `alma-kitten+epel-10-*`, `almalinux-kitten-10-*`, `centos-stream+epel-next-8-*`, `centos-stream-8`, `custom-*`, `epel-7`, `mageia-*`, `openeuler-20.03-*`, `openeuler-22.03-*`, `rhel-7`, and `rhel-8`.
+- The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to chroots whose architecture appears in `packages.json`, then filtered again by excluded distro IDs or distro prefixes from the global `chroot_exclude_distros` list.
+- All tracked packages currently target `aarch64` and `x86_64`, excluding `alma-kitten+epel-10-*`, `almalinux-kitten-10-*`, `centos-stream+epel-next-8-*`, `centos-stream-8`, `custom-*`, `epel-7`, `mageia-*`, `openeuler-*`, `rhel-7`, and `rhel-8`.
 - `gogcli` uses vendored Go modules.
 - `wacli` uses vendored Go modules and follows the upstream CGO `sqlite_fts5` build configuration so the local message index keeps FTS5 enabled.
 - `codex` uses the upstream Linux musl release artifacts and depends on the Fedora `ripgrep` package instead of bundling `rg`.
