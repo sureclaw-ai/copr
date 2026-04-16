@@ -25,6 +25,15 @@
     },
     {
       "chroot_arches": ["aarch64", "x86_64"],
+      "name": "wacli",
+      "project": "wacli",
+      "subdir": "packages/wacli",
+      "spec": "wacli.spec",
+      "upstream_url": "https://github.com/steipete/wacli.git",
+      "tag_prefix": "v"
+    },
+    {
+      "chroot_arches": ["aarch64", "x86_64"],
       "name": "codex",
       "project": "codex",
       "subdir": "packages/codex",

@@ -9,6 +9,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 | Package | Status |
 | --- | --- |
 | `gogcli` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/gogcli/package/gogcli/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/gogcli/package/gogcli/) |
+| `wacli` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/wacli/package/wacli/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/wacli/package/wacli/) |
 | `codex` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/codex/package/codex/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/codex/package/codex/) |
 | `opencode` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/opencode/package/opencode/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/opencode/package/opencode/) |
 | `ollama` | [![Copr build status](https://copr.fedorainfracloud.org/coprs/sureclaw/ollama/package/ollama/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/sureclaw/ollama/package/ollama/) |
@@ -17,6 +18,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 ## Packages
 
 - `gogcli`: source-built from upstream git tags with vendored Go modules
+- `wacli`: source-built from upstream git tags with vendored Go modules, with CGO enabled and the upstream `sqlite_fts5` build tag
 - `codex`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`, with a runtime dependency on `ripgrep`
 - `opencode`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`
 - `ollama`: repackaged from upstream Linux release bundles for `x86_64` and `aarch64`
@@ -52,22 +54,24 @@ The workflow runs daily at `00:15` UTC and can also be started manually. Use the
 ## How the workflow behaves
 
 1. Checks the latest upstream `v*` tag from `https://github.com/steipete/gogcli.git`.
-2. Checks the latest upstream `rust-v*` tag from `https://github.com/openai/codex.git`.
-3. Checks the latest upstream `v*` tag from `https://github.com/anomalyco/opencode.git`.
-4. Checks the latest upstream `v*` tag from `https://github.com/ollama/ollama.git`.
-5. Checks the latest npm `latest` dist-tag for `@anthropic-ai/claude-code`.
-6. Uses `uv` to install the pinned Python toolchain and workflow dependencies from `uv.lock`.
-7. Checks all tracked upstream sources concurrently, updates any package spec whose upstream version changed, and pushes that commit back to this repository.
-8. Ensures each canonical package COPR project exists, enables all currently available COPR chroots for that package's configured architectures except excluded distros, and turns on `follow-fedora-branching`.
-9. Ensures every package source points at this repository and uses the `make_srpm` method from its package subdirectory.
-10. Ensures the umbrella COPR project `ai` exists and carries runtime dependencies on the canonical package COPRs.
-11. Starts COPR builds only for canonical package projects whose versions changed, or for all canonical package projects when the manual workflow is run with `force_build=true`.
+2. Checks the latest upstream `v*` tag from `https://github.com/steipete/wacli.git`.
+3. Checks the latest upstream `rust-v*` tag from `https://github.com/openai/codex.git`.
+4. Checks the latest upstream `v*` tag from `https://github.com/anomalyco/opencode.git`.
+5. Checks the latest upstream `v*` tag from `https://github.com/ollama/ollama.git`.
+6. Checks the latest npm `latest` dist-tag for `@anthropic-ai/claude-code`.
+7. Uses `uv` to install the pinned Python toolchain and workflow dependencies from `uv.lock`.
+8. Checks all tracked upstream sources concurrently, updates any package spec whose upstream version changed, and pushes that commit back to this repository.
+9. Ensures each canonical package COPR project exists, enables all currently available COPR chroots for that package's configured architectures except excluded distros, and turns on `follow-fedora-branching`.
+10. Ensures every package source points at this repository and uses the `make_srpm` method from its package subdirectory.
+11. Ensures the umbrella COPR project `ai` exists and carries runtime dependencies on the canonical package COPRs.
+12. Starts COPR builds only for canonical package projects whose versions changed, or for all canonical package projects when the manual workflow is run with `force_build=true`.
 
 ## Notes
 
 - The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to chroots whose architecture appears in `packages.json`, then filtered again by excluded distro IDs or distro prefixes from `packages.json`.
-- All tracked packages currently target `aarch64` and `x86_64`, excluding `alma-kitten+epel-10-*`, `almalinux-kitten-10-*`, `centos-stream+epel-next-8-*`, `centos-stream-8`, `custom-*`, `epel-7`, `mageia-*`, `rhel-7`, and `rhel-8`.
+- All tracked packages currently target `aarch64` and `x86_64`, excluding `alma-kitten+epel-10-*`, `almalinux-kitten-10-*`, `centos-stream+epel-next-8-*`, `centos-stream-8`, `custom-*`, `epel-7`, `mageia-*`, `openeuler-20.03-*`, `openeuler-22.03-*`, `rhel-7`, and `rhel-8`.
 - `gogcli` uses vendored Go modules.
+- `wacli` uses vendored Go modules and follows the upstream CGO `sqlite_fts5` build configuration so the local message index keeps FTS5 enabled.
 - `codex` uses the upstream Linux musl release artifacts and depends on the Fedora `ripgrep` package instead of bundling `rg`.
 - `opencode` uses the upstream Linux release artifacts and packages the `x86_64` baseline build so one RPM works on a wider range of Fedora systems.
 - `ollama` uses the upstream Linux release bundles and does not package the separate ROCm or JetPack add-on archives.
