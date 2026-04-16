@@ -34,7 +34,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 - `scripts/make_binary_release_srpm.sh`: downloads release artifacts and emits an SRPM
 - `scripts/make_npm_srpm.sh`: downloads an npm package tarball and emits an SRPM
 - `scripts/ensure_copr.py`: creates or updates the COPR project and package source definition
-- `.github/workflows/update-copr.yml`: daily upstream check plus optional manual rebuild
+- `.github/workflows/update-copr.yml`: daily upstream check, rebuild on pushes to `main`, plus optional manual rebuild
 
 ## GitHub configuration
 
@@ -49,7 +49,7 @@ Add these repository secrets:
 - `COPR_USERNAME`
 - `COPR_TOKEN`
 
-The workflow runs daily at `00:15` UTC and can also be started manually. Use the manual run with `force_build=true` for the first bootstrap build or to rebuild the currently packaged version.
+The workflow runs daily at `00:15` UTC, on pushes to `main`, and can also be started manually. Use the manual run with `force_build=true` for the first bootstrap build or to rebuild the currently packaged version.
 
 ## How the workflow behaves
 
