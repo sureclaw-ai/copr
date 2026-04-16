@@ -11,7 +11,9 @@
     "centos-stream+epel-next-8",
     "custom",
     "almalinux-kitten-10",
-    "alma-kitten+epel-10"
+    "alma-kitten+epel-10",
+    "openeuler-20.03",
+    "openeuler-22.03"
   ],
   "packages": [
     {
