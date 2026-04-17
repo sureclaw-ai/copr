@@ -1,4 +1,6 @@
 %global debug_package %{nil}
+%global __provides_exclude_from ^%{_prefix}/lib/ollama/.*$
+%global __requires_exclude_from ^%{_prefix}/lib/ollama/.*$
 
 Name:           ollama
 Version:        0.21.0
