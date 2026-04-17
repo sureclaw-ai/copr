@@ -77,11 +77,35 @@ repo_path="${upstream_url#https://github.com/}"
 repo_path="${repo_path%.git}"
 mkdir -p "$sources_dir" "$docsdir"
 
+curl_download() {
+  local url="$1"
+  local output_path="$2"
+  local max_attempts=5
+  local attempt=1
+  local delay_seconds=2
+
+  while (( attempt <= max_attempts )); do
+    rm -f "$output_path"
+    if curl -fsSL "$url" -o "$output_path"; then
+      return 0
+    fi
+
+    if (( attempt == max_attempts )); then
+      echo "Failed to download ${url} after ${max_attempts} attempts" >&2
+      return 1
+    fi
+
+    sleep "$delay_seconds"
+    (( attempt += 1 ))
+  done
+}
+
 download_release_asset() {
   local asset_name="$1"
   local output_name="$2"
-  curl -fsSL "https://github.com/${repo_path}/releases/download/${tag}/${asset_name}" \
-    -o "${sources_dir}/${output_name}"
+  local output_path="${sources_dir}/${output_name}"
+  local direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  curl_download "${direct_url}" "${output_path}"
 }
 
 download_release_asset "${release_asset_x86_64}" "${release_source_x86_64}"
