@@ -10,15 +10,44 @@ URL:            https://github.com/NousResearch/hermes-agent
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
-BuildRequires:  python3
-BuildRequires:  python3-build
-BuildRequires:  python3-pip
-BuildRequires:  python3-setuptools
-BuildRequires:  python3-wheel
+%if 0%{?amzn}
+%global hermes_python_cmd python3.11
+%global hermes_python_pkg python3.11
+%global hermes_python_pip python3.11-pip
+%global hermes_python_setuptools python3.11-setuptools
+%global hermes_python_wheel python3.11-wheel
+%else
+%if 0%{?rhel} == 9
+%global hermes_python_cmd python3.11
+%global hermes_python_pkg python3.11
+%global hermes_python_pip python3.11-pip
+%global hermes_python_setuptools python3.11-setuptools
+%global hermes_python_wheel python3.11-wheel
+%else
+%if 0%{?sle_version}
+%global hermes_python_cmd python3.11
+%global hermes_python_pkg python311
+%global hermes_python_pip python311-pip
+%global hermes_python_setuptools python311-setuptools
+%global hermes_python_wheel python311-wheel
+%else
+%global hermes_python_cmd python3
+%global hermes_python_pkg python3
+%global hermes_python_pip python3-pip
+%global hermes_python_setuptools python3-setuptools
+%global hermes_python_wheel python3-wheel
+%endif
+%endif
+%endif
+
+BuildRequires:  %{hermes_python_pkg}
+BuildRequires:  %{hermes_python_pip}
+BuildRequires:  %{hermes_python_setuptools}
+BuildRequires:  %{hermes_python_wheel}
 
 Requires:       git
-Requires:       python3
-Requires:       python3-pip
+Requires:       %{hermes_python_pkg}
+Requires:       %{hermes_python_pip}
 Requires:       ripgrep
 
 %description
@@ -33,7 +62,7 @@ the packaged wheel into it with pip.
 %autosetup -n %{name}-%{version}
 
 %build
-python3 -m build --wheel --no-isolation
+%{hermes_python_cmd} -m pip wheel --no-deps --no-build-isolation --wheel-dir dist .
 
 %install
 install -d %{buildroot}%{_datadir}/%{name}
@@ -64,7 +93,7 @@ fi
 if [ ! -x "${venv}/bin/${cmd}" ] || [ ! -f "${marker}" ] || [ "$(cat "$marker" 2>/dev/null || true)" != "$version" ]; then
   rm -rf "$venv"
   mkdir -p "$install_dir"
-  python3 -m venv "$venv"
+  %{hermes_python_cmd} -m venv "$venv"
   "${venv}/bin/python" -m pip install --upgrade pip setuptools wheel
   if [ -n "$extras" ]; then
     "${venv}/bin/python" -m pip install "${wheel}[${extras}]"
