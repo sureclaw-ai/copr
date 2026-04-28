@@ -89,6 +89,13 @@ printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
 printf '%s\n' "$date" >"${srcdir}/.copr-date"
 rm -rf "${srcdir}/.git"
 
+(
+  cd "$srcdir"
+  export GOFLAGS="-mod=mod"
+  export GOWORK=off
+  go mod tidy
+)
+
 tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
 
 (
