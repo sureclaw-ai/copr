@@ -11,6 +11,7 @@ Source0:        %{name}-%{version}-x86_64.tar.gz
 Source1:        %{name}-%{version}-aarch64.tar.gz
 Source2:        %{name}-%{version}-docs.tar.gz
 
+Requires:       bubblewrap
 Requires:       ripgrep
 ExclusiveArch:  aarch64 x86_64
 

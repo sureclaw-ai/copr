@@ -20,7 +20,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 
 - `gogcli`: source-built from upstream git tags with vendored Go modules
 - `wacli`: source-built from upstream git tags with vendored Go modules, with CGO enabled and the upstream `sqlite_fts5` build tag
-- `codex`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`, with a runtime dependency on `ripgrep`
+- `codex`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`, with runtime dependencies on `bubblewrap` and `ripgrep`
 - `opencode`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`
 - `ollama`: repackaged from upstream Linux release bundles for `x86_64` and `aarch64`
 - `claude-code`: repackaged from the `@anthropic-ai/claude-code` npm tarball for `x86_64` and `aarch64`, with a Node.js runtime wrapper for the upstream `claude` command
@@ -76,7 +76,7 @@ The workflow runs daily at `00:15` UTC, on pushes to `main`, and can also be sta
 - All tracked packages currently target `aarch64` and `x86_64`, excluding `alma-kitten+epel-10-*`, `almalinux-kitten-10-*`, `centos-stream+epel-next-8-*`, `centos-stream-8`, `custom-*`, `epel-7`, `fedora-eln-*`, `mageia-*`, `openeuler-*`, `rhel-7`, and `rhel-8`.
 - `gogcli` uses vendored Go modules.
 - `wacli` uses vendored Go modules and follows the upstream CGO `sqlite_fts5` build configuration so the local message index keeps FTS5 enabled.
-- `codex` uses the upstream Linux musl release artifacts and depends on the Fedora `ripgrep` package instead of bundling `rg`.
+- `codex` uses the upstream Linux musl release artifacts and depends on the Fedora `bubblewrap` and `ripgrep` packages instead of bundling `rg`.
 - `opencode` uses the upstream Linux release artifacts and packages the `x86_64` baseline build so one RPM works on a wider range of Fedora systems.
 - `ollama` uses the upstream Linux release bundles and does not package the separate ROCm or JetPack add-on archives.
 - `claude-code` uses the upstream npm tarball and installs the upstream `claude` command name.
