@@ -12,6 +12,7 @@ outdir=""
 package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/steipete/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
+go_version_compat="${GO_VERSION_COMPAT:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -61,6 +62,28 @@ mkdir -p "$sources_dir"
 git clone --depth 1 --branch "$tag" "$upstream_url" "$srcdir"
 commit="$(git -C "$srcdir" rev-parse --short=12 HEAD)"
 date="$(TZ=UTC git -C "$srcdir" log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd HEAD)"
+
+if [[ -n "$go_version_compat" ]]; then
+  if [[ ! -f "${srcdir}/go.mod" ]]; then
+    echo "GO_VERSION_COMPAT was set but ${srcdir}/go.mod does not exist" >&2
+    exit 1
+  fi
+  go_mod_tmp="${srcdir}/go.mod.tmp"
+  awk -v compat="$go_version_compat" '
+    /^go [0-9]+\.[0-9]+(\.[0-9]+)?$/ && !updated {
+      print "go " compat
+      updated = 1
+      next
+    }
+    { print }
+    END { if (!updated) exit 2 }
+  ' "${srcdir}/go.mod" >"$go_mod_tmp" || {
+    rm -f "$go_mod_tmp"
+    echo "Unable to update go directive in ${srcdir}/go.mod" >&2
+    exit 1
+  }
+  mv "$go_mod_tmp" "${srcdir}/go.mod"
+fi
 
 printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
 printf '%s\n' "$date" >"${srcdir}/.copr-date"

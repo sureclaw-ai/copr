@@ -10,6 +10,7 @@
     "centos-stream-8",
     "centos-stream+epel-next-8",
     "custom",
+    "fedora-eln",
     "almalinux-kitten-10",
     "alma-kitten+epel-10",
     "openeuler"
@@ -67,6 +68,17 @@
       "subdir": "packages/claude-code",
       "spec": "claude-code.spec",
       "npm_package": "@anthropic-ai/claude-code"
+    },
+    {
+      "chroot_arches": ["aarch64", "x86_64"],
+      "name": "hermes-agent",
+      "project": "hermes-agent",
+      "subdir": "packages/hermes-agent",
+      "spec": "hermes-agent.spec",
+      "upstream_url": "https://github.com/NousResearch/hermes-agent.git",
+      "tag_prefix": "v",
+      "tag_version_pattern": "(\\d{4}\\.\\d+\\.\\d+)",
+      "version_source": "pyproject"
     }
   ]
 }

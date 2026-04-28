@@ -12,6 +12,7 @@ import sys
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+import tomllib
 
 VERSION_LINE_RE = re.compile(r"^(Version:\s+)(\S+)(\s*)$")
 RELEASE_LINE_RE = re.compile(r"^(Release:\s+)(\S+)(\s*)$")
@@ -29,6 +30,8 @@ class PackageCheck:
     upstream_url: str | None = None
     npm_package: str | None = None
     tag_prefix: str = "v"
+    tag_version_pattern: str = r"(\d+\.\d+\.\d+)"
+    version_source: str = "tag"
 
 
 @dataclass(frozen=True)
@@ -41,6 +44,13 @@ class PackageResult:
 
 def version_key(version: str) -> tuple[int, ...]:
     return tuple(int(part) for part in version.split("."))
+
+
+def github_raw_url(upstream_url: str, tag: str, path: str) -> str:
+    repo_path = upstream_url.removeprefix("https://github.com/").removesuffix(".git")
+    if repo_path == upstream_url:
+        raise RuntimeError(f"unsupported upstream URL for raw fetch: {upstream_url}")
+    return f"https://raw.githubusercontent.com/{repo_path}/{urllib.parse.quote(tag, safe='')}/{path}"
 
 
 def read_spec_version(spec_path: pathlib.Path) -> str:
@@ -73,18 +83,48 @@ async def git_ls_remote(upstream_url: str, *, timeout: int = DEFAULT_GIT_TIMEOUT
     return stdout.decode()
 
 
-async def latest_upstream_version(upstream_url: str, tag_prefix: str) -> str:
-    tag_re = re.compile(rf"refs/tags/{re.escape(tag_prefix)}(\d+\.\d+\.\d+)$")
+async def latest_upstream_tag(upstream_url: str, tag_prefix: str, tag_version_pattern: str) -> tuple[str, str]:
+    tag_re = re.compile(rf"refs/tags/({re.escape(tag_prefix)}{tag_version_pattern})$")
     output = await git_ls_remote(upstream_url)
-    versions = []
+    versions: list[tuple[str, str]] = []
     for line in output.splitlines():
         _, ref = line.split("\t", 1)
         match = tag_re.search(ref)
         if match:
-            versions.append(match.group(1))
+            versions.append((match.group(1), match.group(2)))
     if not versions:
-        raise RuntimeError(f"no semver tags found in {upstream_url} with prefix {tag_prefix!r}")
-    return max(versions, key=version_key)
+        raise RuntimeError(f"no matching tags found in {upstream_url} with prefix {tag_prefix!r}")
+    return max(versions, key=lambda item: version_key(item[1]))
+
+
+async def latest_pyproject_version(upstream_url: str, tag: str) -> str:
+    def fetch() -> str:
+        request = urllib.request.Request(
+            github_raw_url(upstream_url, tag, "pyproject.toml"),
+            headers={"User-Agent": "gogcli-copr-check-upstream/1.0"},
+        )
+        with urllib.request.urlopen(request, timeout=DEFAULT_HTTP_TIMEOUT) as response:
+            pyproject = tomllib.loads(response.read().decode("utf-8"))
+        try:
+            return pyproject["project"]["version"]
+        except KeyError as exc:
+            raise RuntimeError(f"could not determine project.version for {upstream_url} at {tag}") from exc
+
+    return await asyncio.to_thread(fetch)
+
+
+async def latest_upstream_version(
+    upstream_url: str,
+    tag_prefix: str,
+    tag_version_pattern: str,
+    version_source: str,
+) -> str:
+    tag, tag_version = await latest_upstream_tag(upstream_url, tag_prefix, tag_version_pattern)
+    if version_source == "tag":
+        return tag_version
+    if version_source == "pyproject":
+        return await latest_pyproject_version(upstream_url, tag)
+    raise RuntimeError(f"unsupported version source: {version_source}")
 
 
 def fetch_npm_metadata(package_name: str, *, timeout: int = DEFAULT_HTTP_TIMEOUT) -> dict:
@@ -109,7 +149,12 @@ async def latest_version_for_package(package: PackageCheck) -> str:
     if package.npm_package:
         return await latest_npm_version(package.npm_package)
     if package.upstream_url:
-        return await latest_upstream_version(package.upstream_url, package.tag_prefix)
+        return await latest_upstream_version(
+            package.upstream_url,
+            package.tag_prefix,
+            package.tag_version_pattern,
+            package.version_source,
+        )
     raise RuntimeError(f"package {package.name} is missing an upstream source")
 
 
@@ -186,6 +231,8 @@ def load_packages(packages_json: pathlib.Path) -> list[PackageCheck]:
             upstream_url=item.get("upstream_url"),
             npm_package=item.get("npm_package"),
             tag_prefix=item.get("tag_prefix", "v"),
+            tag_version_pattern=item.get("tag_version_pattern", r"(\d+\.\d+\.\d+)"),
+            version_source=item.get("version_source", "tag"),
         )
         if bool(package.upstream_url) == bool(package.npm_package):
             raise RuntimeError(
@@ -202,6 +249,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--upstream-url")
     parser.add_argument("--npm-package")
     parser.add_argument("--tag-prefix", default="v")
+    parser.add_argument("--tag-version-pattern", default=r"(\d+\.\d+\.\d+)")
+    parser.add_argument("--version-source", choices=("tag", "pyproject"), default="tag")
     parser.add_argument("--update", action="store_true")
     parser.add_argument("--github-output", type=pathlib.Path)
     parser.add_argument("--jobs", type=int, default=DEFAULT_JOBS)
@@ -214,9 +263,15 @@ def parse_args() -> argparse.Namespace:
         if bool(args.upstream_url) == bool(args.npm_package):
             parser.error("provide exactly one of --upstream-url or --npm-package")
     else:
-        disallowed = [args.upstream_url, args.npm_package]
+        disallowed = [
+            args.upstream_url,
+            args.npm_package,
+            args.tag_prefix != "v",
+            args.tag_version_pattern != r"(\d+\.\d+\.\d+)",
+            args.version_source != "tag",
+        ]
         if any(disallowed):
-            parser.error("--upstream-url and --npm-package are only valid with --spec")
+            parser.error("source selection arguments are only valid with --spec")
 
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")
@@ -274,6 +329,8 @@ def main() -> int:
                 upstream_url=args.upstream_url,
                 npm_package=args.npm_package,
                 tag_prefix=args.tag_prefix,
+                tag_version_pattern=args.tag_version_pattern,
+                version_source=args.version_source,
             )
         ]
     else:
