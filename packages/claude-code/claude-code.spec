@@ -1,8 +1,8 @@
 %global debug_package %{nil}
 
 Name:           claude-code
-Version:        2.1.119
-Release:        2%{?dist}
+Version:        2.1.121
+Release:        1%{?dist}
 Summary:        Anthropic Claude Code terminal assistant
 
 License:        LicenseRef-Anthropic-Claude-Code
@@ -39,6 +39,9 @@ install -Dpm0755 %{SOURCE2} %{buildroot}%{_bindir}/claude
 %{_bindir}/claude
 
 %changelog
+* Tue Apr 28 2026 Codex Automation <noreply@users.noreply.github.com> - 2.1.121-1
+- Update to v2.1.121
+
 * Tue Apr 28 2026 Codex Automation <noreply@users.noreply.github.com> - 2.1.119-2
 - Package the native Linux binaries from Anthropic's release feed
 
