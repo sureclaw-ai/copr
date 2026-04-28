@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
 usage() {
   cat <<'EOF'
@@ -14,7 +14,7 @@ upstream_url="${UPSTREAM_URL:-}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 upstream_tag_version_pattern="${UPSTREAM_TAG_VERSION_PATTERN:-[0-9][0-9][0-9][0-9].[0-9]*.[0-9]*}"
 
-while [[ $# -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
   case "$1" in
     --spec)
       spec="$2"
@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$spec" || -z "$outdir" || -z "$package_name" || -z "$upstream_url" ]]; then
+if [ -z "$spec" ] || [ -z "$outdir" ] || [ -z "$package_name" ] || [ -z "$upstream_url" ]; then
   usage >&2
   exit 1
 fi
@@ -46,7 +46,7 @@ mkdir -p "$outdir"
 outdir="$(realpath "$outdir")"
 
 version="$(awk '$1 == "Version:" { print $2; exit }' "$spec")"
-if [[ -z "$version" ]]; then
+if [ -z "$version" ]; then
   echo "Unable to determine version from $spec" >&2
   exit 1
 fi
@@ -69,7 +69,7 @@ candidate_tags="$(
     sort -Vr
 )"
 
-if [[ -z "$candidate_tags" ]]; then
+if [ -z "$candidate_tags" ]; then
   echo "Unable to determine matching tags from $upstream_url" >&2
   exit 1
 fi
@@ -85,17 +85,19 @@ PY
 }
 
 selected_tag=""
+candidate_tags_file="${workdir}/candidate-tags"
+printf '%s\n' "$candidate_tags" >"$candidate_tags_file"
 while IFS= read -r candidate_tag; do
   rm -rf "$srcdir"
   git clone --depth 1 --branch "$candidate_tag" "$upstream_url" "$srcdir"
   source_version="$(source_version_for_pyproject "$srcdir/pyproject.toml")"
-  if [[ "$source_version" == "$version" ]]; then
+  if [ "$source_version" = "$version" ]; then
     selected_tag="$candidate_tag"
     break
   fi
-done <<<"$candidate_tags"
+done <"$candidate_tags_file"
 
-if [[ -z "$selected_tag" ]]; then
+if [ -z "$selected_tag" ]; then
   echo "Unable to find an upstream tag for pyproject version $version" >&2
   exit 1
 fi

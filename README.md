@@ -24,7 +24,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 - `opencode`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`
 - `ollama`: repackaged from upstream Linux release bundles for `x86_64` and `aarch64`
 - `claude-code`: repackaged from the `@anthropic-ai/claude-code` npm tarball for `x86_64` and `aarch64`, with a Node.js runtime wrapper for the upstream `claude` command
-- `hermes-agent`: packaged from upstream GitHub tags, with a launcher that creates a per-user Python virtual environment from the packaged source on first run
+- `hermes-agent`: packaged from upstream GitHub tags, with a launcher that creates a per-user Python virtual environment from the packaged wheel on first run
 - `ai`: umbrella COPR project that enables the canonical package COPRs together
 
 ## What is included
@@ -81,5 +81,5 @@ The workflow runs daily at `00:15` UTC, on pushes to `main`, and can also be sta
 - `ollama` uses the upstream Linux release bundles and does not package the separate ROCm or JetPack add-on archives.
 - `claude-code` uses the upstream npm tarball and installs the upstream `claude` command name.
 - `claude-code` is proprietary software distributed under Anthropic's legal terms rather than an open-source license; review those terms before publishing it in a public COPR.
-- `hermes-agent` uses the upstream date-style release tags, but tracks the Python package version from `pyproject.toml`. Its RPM installs source under `/usr/share/hermes-agent`; the installed launcher creates a user-local virtual environment on first run.
+- `hermes-agent` uses the upstream date-style release tags, but tracks the Python package version from `pyproject.toml`. Its RPM installs the built wheel and `optional-skills` tree under `/usr/share/hermes-agent`; the installed launcher creates a user-local virtual environment from that wheel on first run.
 - The umbrella `ai` COPR does not rebuild packages; it only points users at the canonical per-package repos through `copr://...` runtime dependencies.

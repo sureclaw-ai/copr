@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
 usage() {
   cat <<'EOF'
@@ -16,7 +16,7 @@ release_asset_x86_64="${RELEASE_ASSET_X86_64:-}"
 release_asset_aarch64="${RELEASE_ASSET_AARCH64:-}"
 doc_files="${DOC_FILES:-LICENSE README.md}"
 
-while [[ $# -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
   case "$1" in
     --spec)
       spec="$2"
@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$spec" || -z "$outdir" || -z "$package_name" || -z "$upstream_url" || -z "$release_asset_x86_64" || -z "$release_asset_aarch64" ]]; then
+if [ -z "$spec" ] || [ -z "$outdir" ] || [ -z "$package_name" ] || [ -z "$upstream_url" ] || [ -z "$release_asset_x86_64" ] || [ -z "$release_asset_aarch64" ]; then
   usage >&2
   exit 1
 fi
@@ -48,18 +48,18 @@ mkdir -p "$outdir"
 outdir="$(realpath "$outdir")"
 
 version="$(awk '$1 == "Version:" { print $2; exit }' "$spec")"
-if [[ -z "$version" ]]; then
+if [ -z "$version" ]; then
   echo "Unable to determine version from $spec" >&2
   exit 1
 fi
 
 source_filename_for_asset() {
-  local arch="$1"
-  local asset_name="$2"
-  local suffix=""
-  if [[ "$asset_name" == *.* ]]; then
-    suffix=".${asset_name#*.}"
-  fi
+  arch="$1"
+  asset_name="$2"
+  suffix=""
+  case "$asset_name" in
+    *.*) suffix=".${asset_name#*.}" ;;
+  esac
   printf '%s-%s-%s%s' "$package_name" "$version" "$arch" "$suffix"
 }
 
@@ -78,33 +78,33 @@ repo_path="${repo_path%.git}"
 mkdir -p "$sources_dir" "$docsdir"
 
 curl_download() {
-  local url="$1"
-  local output_path="$2"
-  local max_attempts=5
-  local attempt=1
-  local delay_seconds=2
+  url="$1"
+  output_path="$2"
+  max_attempts=5
+  attempt=1
+  delay_seconds=2
 
-  while (( attempt <= max_attempts )); do
+  while [ "$attempt" -le "$max_attempts" ]; do
     rm -f "$output_path"
     if curl -fsSL "$url" -o "$output_path"; then
       return 0
     fi
 
-    if (( attempt == max_attempts )); then
+    if [ "$attempt" -eq "$max_attempts" ]; then
       echo "Failed to download ${url} after ${max_attempts} attempts" >&2
       return 1
     fi
 
     sleep "$delay_seconds"
-    (( attempt += 1 ))
+    attempt=$((attempt + 1))
   done
 }
 
 download_release_asset() {
-  local asset_name="$1"
-  local output_name="$2"
-  local output_path="${sources_dir}/${output_name}"
-  local direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  asset_name="$1"
+  output_name="$2"
+  output_path="${sources_dir}/${output_name}"
+  direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
   curl_download "${direct_url}" "${output_path}"
 }
 

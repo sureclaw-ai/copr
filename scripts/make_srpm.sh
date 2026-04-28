@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
 usage() {
   cat <<'EOF'
@@ -14,7 +14,7 @@ upstream_url="${UPSTREAM_URL:-https://github.com/steipete/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 go_version_compat="${GO_VERSION_COMPAT:-}"
 
-while [[ $# -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
   case "$1" in
     --spec)
       spec="$2"
@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$spec" || -z "$outdir" ]]; then
+if [ -z "$spec" ] || [ -z "$outdir" ]; then
   usage >&2
   exit 1
 fi
@@ -46,7 +46,7 @@ mkdir -p "$outdir"
 outdir="$(realpath "$outdir")"
 
 version="$(awk '$1 == "Version:" { print $2; exit }' "$spec")"
-if [[ -z "$version" ]]; then
+if [ -z "$version" ]; then
   echo "Unable to determine version from $spec" >&2
   exit 1
 fi
@@ -63,8 +63,8 @@ git clone --depth 1 --branch "$tag" "$upstream_url" "$srcdir"
 commit="$(git -C "$srcdir" rev-parse --short=12 HEAD)"
 date="$(TZ=UTC git -C "$srcdir" log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd HEAD)"
 
-if [[ -n "$go_version_compat" ]]; then
-  if [[ ! -f "${srcdir}/go.mod" ]]; then
+if [ -n "$go_version_compat" ]; then
+  if [ ! -f "${srcdir}/go.mod" ]; then
     echo "GO_VERSION_COMPAT was set but ${srcdir}/go.mod does not exist" >&2
     exit 1
   fi

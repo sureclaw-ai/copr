@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
 usage() {
   cat <<'EOF'
@@ -12,7 +12,7 @@ outdir=""
 package_name="${PACKAGE_NAME:-}"
 npm_package="${NPM_PACKAGE:-}"
 
-while [[ $# -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
   case "$1" in
     --spec)
       spec="$2"
@@ -34,7 +34,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$spec" || -z "$outdir" || -z "$package_name" || -z "$npm_package" ]]; then
+if [ -z "$spec" ] || [ -z "$outdir" ] || [ -z "$package_name" ] || [ -z "$npm_package" ]; then
   usage >&2
   exit 1
 fi
@@ -44,7 +44,7 @@ mkdir -p "$outdir"
 outdir="$(realpath "$outdir")"
 
 version="$(awk '$1 == "Version:" { print $2; exit }' "$spec")"
-if [[ -z "$version" ]]; then
+if [ -z "$version" ]; then
   echo "Unable to determine version from $spec" >&2
   exit 1
 fi

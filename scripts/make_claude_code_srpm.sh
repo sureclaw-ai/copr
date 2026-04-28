@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
 usage() {
   cat <<'EOF'
@@ -13,7 +13,7 @@ package_name="claude-code"
 npm_package="@anthropic-ai/claude-code"
 download_base_url="https://downloads.claude.ai/claude-code-releases"
 
-while [[ $# -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
   case "$1" in
     --spec)
       spec="$2"
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$spec" || -z "$outdir" ]]; then
+if [ -z "$spec" ] || [ -z "$outdir" ]; then
   usage >&2
   exit 1
 fi
@@ -45,7 +45,7 @@ mkdir -p "$outdir"
 outdir="$(realpath "$outdir")"
 
 version="$(awk '$1 == "Version:" { print $2; exit }' "$spec")"
-if [[ -z "$version" ]]; then
+if [ -z "$version" ]; then
   echo "Unable to determine version from $spec" >&2
   exit 1
 fi

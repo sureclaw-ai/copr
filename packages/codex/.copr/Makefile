@@ -1,4 +1,4 @@
-SHELL := /bin/bash
+SHELL := /bin/sh
 
 .PHONY: srpm
 
@@ -11,4 +11,3 @@ srpm:
 	RELEASE_ASSET_AARCH64="codex-aarch64-unknown-linux-musl.tar.gz" \
 	DOC_FILES="LICENSE NOTICE README.md" \
 	../../scripts/make_binary_release_srpm.sh --spec "$(spec)" --outdir "$(outdir)"
-
