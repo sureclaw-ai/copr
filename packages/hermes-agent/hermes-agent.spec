@@ -103,6 +103,7 @@ if [ ! -x "${venv}/bin/${cmd}" ] || [ ! -f "${marker}" ] || [ "$(cat "$marker" 2
   printf '%s\n' "$version" > "$marker"
 fi
 
+export HERMES_OPTIONAL_SKILLS="${payload_dir}/optional-skills"
 exec "${venv}/bin/${cmd}" "$@"
 EOF
 chmod 0755 %{buildroot}%{_bindir}/hermes
