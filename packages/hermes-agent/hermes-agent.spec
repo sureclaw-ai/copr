@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           hermes-agent
-Version:        0.11.0
+Version:        0.12.0
 Release:        1%{?dist}
 Summary:        Self-improving AI agent by Nous Research
 
@@ -123,5 +123,8 @@ test -d %{buildroot}%{_datadir}/%{name}/optional-skills
 %{_datadir}/%{name}
 
 %changelog
+* Fri May 01 2026 Codex Automation <noreply@users.noreply.github.com> - 0.12.0-1
+- Update to v0.12.0
+
 * Tue Apr 28 2026 Codex Automation <noreply@users.noreply.github.com> - 0.11.0-1
 - Initial COPR packaging for Hermes Agent
