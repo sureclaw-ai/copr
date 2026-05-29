@@ -1,5 +1,12 @@
 %global debug_package %{nil}
 
+# The native `claude` binary is a Bun single-file executable: its application
+# payload is appended after the ELF image. RPM's default post-install
+# processing strips the ELF, which drops that trailer and degrades the binary
+# into the bare Bun runtime (so `claude` just launches Bun). Disable all
+# automatic binary post-processing to ship the upstream artifact byte-for-byte.
+%global __os_install_post %{nil}
+
 Name:           claude-code
 Version:        2.1.156
 Release:        1%{?dist}

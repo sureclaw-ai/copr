@@ -23,7 +23,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 - `codex`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`, with runtime dependencies on `bubblewrap` and `ripgrep`
 - `opencode`: repackaged from upstream Linux release binaries for `x86_64` and `aarch64`
 - `ollama`: repackaged from upstream Linux release bundles for `x86_64` and `aarch64`
-- `claude-code`: repackaged from the `@anthropic-ai/claude-code` npm tarball for `x86_64` and `aarch64`, with a Node.js runtime wrapper for the upstream `claude` command
+- `claude-code`: repackaged from Anthropic's native release feed (the upstream Bun single-file `claude` binary, checksum-verified against the release manifest) for `x86_64` and `aarch64`; RPM binary post-processing is disabled so the executable ships byte-for-byte
 - `hermes-agent`: packaged from upstream GitHub tags, with a launcher that creates a per-user Python virtual environment from the packaged wheel on first run
 - `ai`: umbrella COPR project that enables the canonical package COPRs together
 
