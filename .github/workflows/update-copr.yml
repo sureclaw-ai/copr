@@ -123,6 +123,14 @@ jobs:
               --subdir "$(jq -r '.subdir' <<<"$package_json")" \
               --spec "$(jq -r '.spec' <<<"$package_json")"
             )
+            timeout="$(jq -r '.timeout // empty' <<<"$package_json")"
+            if [[ -n "$timeout" ]]; then
+              package_args+=(--timeout "$timeout")
+            fi
+            max_builds="$(jq -r '.max_builds // empty' <<<"$package_json")"
+            if [[ -n "$max_builds" ]]; then
+              package_args+=(--max-builds "$max_builds")
+            fi
             while IFS= read -r arch; do
               package_args+=(--arch "$arch")
             done < <(jq -r '.chroot_arches[]?' <<<"$package_json")

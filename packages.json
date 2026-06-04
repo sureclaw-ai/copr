@@ -68,6 +68,16 @@
       "subdir": "packages/claude-code",
       "spec": "claude-code.spec",
       "npm_package": "@anthropic-ai/claude-code"
+    },
+    {
+      "chroot_arches": ["aarch64", "x86_64"],
+      "name": "nodejs25-caged",
+      "project": "nodejs25-caged",
+      "subdir": "packages/nodejs25-caged",
+      "spec": "nodejs25-caged.spec",
+      "node_major": 25,
+      "timeout": 21600,
+      "max_builds": 5
     }
   ]
 }
