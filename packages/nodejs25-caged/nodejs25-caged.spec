@@ -15,6 +15,7 @@ Source1:        https://nodejs.org/dist/v%{version}/SHASUMS256.txt
 BuildRequires:  clang
 BuildRequires:  findutils
 BuildRequires:  gcc-c++
+BuildRequires:  libatomic
 BuildRequires:  make
 BuildRequires:  python3
 BuildRequires:  tar
