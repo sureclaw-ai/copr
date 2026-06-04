@@ -4,7 +4,7 @@
 
 Name:           ollama
 Version:        0.30.2
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Local LLM runner and API server
 
 License:        MIT
@@ -34,6 +34,17 @@ tar --zstd -xf %{SOURCE1}
 install -Dpm0755 bin/ollama %{buildroot}%{_bindir}/ollama
 install -d %{buildroot}%{_prefix}/lib
 cp -a lib/ollama %{buildroot}%{_prefix}/lib/
+# Upstream binaries can include "$ORIGIN:/build/llama-server-cpu/bin:".
+# Terminate the dynamic-string entry after "$ORIGIN" so check-rpaths only sees
+# the valid sibling-library lookup path.
+find %{buildroot}%{_prefix}/lib/ollama -type f -name '*.so' -exec sh -c '
+for file; do
+  offsets="$(LC_ALL=C grep -aobF ":/build/llama-server-cpu/bin:" "$file" 2>/dev/null | cut -d: -f1 || true)"
+  for offset in $offsets; do
+    printf "\000" | dd of="$file" bs=1 seek="$offset" count=1 conv=notrunc status=none
+  done
+done
+' sh {} +
 
 %check
 %{buildroot}%{_bindir}/ollama --version >/dev/null
@@ -45,6 +56,9 @@ cp -a lib/ollama %{buildroot}%{_prefix}/lib/
 %{_prefix}/lib/ollama/
 
 %changelog
+* Thu Jun 04 2026 Codex Automation <noreply@users.noreply.github.com> - 0.30.2-2
+- Normalize bundled shared-library RUNPATHs
+
 * Wed Jun 03 2026 Codex Automation <noreply@users.noreply.github.com> - 0.30.2-1
 - Update to v0.30.2
 
