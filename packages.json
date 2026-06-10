@@ -77,7 +77,8 @@
       "spec": "nodejs25-caged.spec",
       "node_major": 25,
       "timeout": 21600,
-      "max_builds": 5
+      "max_builds": 5,
+      "exclude_distros": ["opensuse-leap", "opensuse-tumbleweed"]
     }
   ]
 }
