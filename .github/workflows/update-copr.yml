@@ -137,6 +137,9 @@ jobs:
             while IFS= read -r distro; do
               package_args+=(--exclude-distro "$distro")
             done < <(jq -r '.chroot_exclude_distros[]?' packages.json)
+            while IFS= read -r distro; do
+              package_args+=(--exclude-distro "$distro")
+            done < <(jq -r '.exclude_distros[]?' <<<"$package_json")
             uv run python scripts/ensure_copr.py "${package_args[@]}"
           done < <(jq -c '.packages[]' packages.json)
 

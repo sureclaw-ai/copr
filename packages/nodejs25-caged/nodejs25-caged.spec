@@ -4,7 +4,7 @@
 
 Name:           nodejs25-caged
 Version:        25.9.0
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Node.js 25 built with V8 pointer compression
 
 License:        MIT
@@ -12,14 +12,25 @@ URL:            https://nodejs.org/
 Source0:        https://nodejs.org/dist/v%{version}/node-v%{version}.tar.xz
 Source1:        https://nodejs.org/dist/v%{version}/SHASUMS256.txt
 
-BuildRequires:  clang
 BuildRequires:  findutils
-BuildRequires:  gcc-c++
 BuildRequires:  libatomic
 BuildRequires:  make
 BuildRequires:  python3
 BuildRequires:  tar
 BuildRequires:  xz
+%if 0%{?amzn}
+# AL2023's default gcc (11) and clang (15) are both too old for Node 25's
+# C++20 deps; gcc 14 ships as a co-installable namespaced package.
+BuildRequires:  gcc14
+BuildRequires:  gcc14-c++
+%else
+BuildRequires:  clang
+BuildRequires:  gcc-c++
+%endif
+%if 0%{?fedora} >= 45
+# Node 25's configure rejects Python > 3.14; rawhide defaults to 3.15.
+BuildRequires:  python3.14
+%endif
 
 Provides:       node = %{version}-%{release}
 Provides:       nodejs = %{version}-%{release}
@@ -41,20 +52,50 @@ enabled.
 %setup -q -n node-v%{version}
 
 %build
-# Prefer clang, but fall back to gcc where clang is too old. Node 25 bundles a
-# V8 that uses C++20 implicit-typename syntax (P0634, "Down with typename!"),
-# which only clang >= 16 accepts; clang 15 (e.g. Amazon Linux 2023) fails to
-# compile V8 with "missing 'typename' prior to dependent type name". Detect the
-# major version via the predefined macro rather than `clang -dumpversion`, which
-# has historically reported a faked gcc-compat version.
+# Node 25 bundles a V8 and an ada URL parser that need a C++20 toolchain:
+# gcc >= 12 or clang >= 16. V8 uses C++20 implicit-typename syntax (P0634,
+# "Down with typename!") that only clang >= 16 accepts, and ada uses constexpr
+# std::string that only gcc >= 12 accepts -- so clang 15 + gcc 11 (both shipped
+# by Amazon Linux 2023) each fail in a different way.
+%if 0%{?amzn}
+# AL2023: use the co-installable gcc 14 (default gcc 11 / clang 15 are too old).
+export CC=gcc14-gcc CXX=gcc14-g++
+%else
+# Elsewhere prefer clang when it's new enough (>= 16), else fall back to gcc.
+# Detect the major version via the predefined macro rather than
+# `clang -dumpversion`, which has historically reported a faked gcc-compat
+# version.
 clang_major="$(echo __clang_major__ | clang -E -P -x c - 2>/dev/null | tr -d '[:space:]')"
 if [ "${clang_major:-0}" -ge 16 ]; then
     export CC=clang CXX=clang++
 else
     export CC=gcc CXX=g++
 fi
+%endif
 %{?set_build_flags}
-./configure \
+
+# Some toolchains (notably EL's gcc-toolset ld) ship only the versioned
+# libatomic.so.1 runtime, not the unversioned libatomic.so linker symlink, so
+# Node's `-latomic` helper targets fail to link with "cannot find -latomic".
+# Provide a local symlink and point the linker at it.
+atomic_lib="$(ls /usr/lib64/libatomic.so.1 /usr/lib/libatomic.so.1 2>/dev/null | head -n1)"
+if [ -n "$atomic_lib" ]; then
+    mkdir -p %{_builddir}/atomic-shim
+    ln -sf "$atomic_lib" %{_builddir}/atomic-shim/libatomic.so
+    export LDFLAGS="${LDFLAGS:-} -L%{_builddir}/atomic-shim"
+fi
+
+# Node 25's configure rejects Python newer than 3.14 (Fedora rawhide ships
+# 3.15). Use the newest interpreter in the supported range and make the build
+# (gyp) use it too.
+for _py in python3.14 python3.13 python3.12 python3.11 python3.10 python3.9 python3; do
+    if command -v "$_py" >/dev/null 2>&1; then
+        PYTHON="$(command -v "$_py")"
+        break
+    fi
+done
+export PYTHON
+"$PYTHON" configure \
     --prefix=%{_prefix} \
     --experimental-enable-pointer-compression
 %make_build
@@ -63,11 +104,16 @@ fi
 %make_install PREFIX=%{_prefix}
 
 %check
-export PATH="%{buildroot}%{_bindir}:$PATH"
-%{buildroot}%{_bindir}/node --version | grep -qx "v%{version}"
-%{buildroot}%{_bindir}/node -p "process.config.variables.v8_enable_pointer_compression" | grep -qx "1"
-%{buildroot}%{_bindir}/npm --version | grep -qx "%{npm_version}"
-%{buildroot}%{_bindir}/npx --version >/dev/null
+# Run node directly on the npm/npx cli scripts: their shebang is the absolute
+# install path (%{_bindir}/node), which does not exist yet at %%check time --
+# only the buildroot copy does -- so invoking the symlinks would fail with
+# "bad interpreter".
+node_bin="%{buildroot}%{_bindir}/node"
+npm_dir="%{buildroot}%{_prefix}/lib/node_modules/npm/bin"
+"$node_bin" --version | grep -qx "v%{version}"
+"$node_bin" -p "process.config.variables.v8_enable_pointer_compression" | grep -qx "1"
+"$node_bin" "$npm_dir/npm-cli.js" --version | grep -qx "%{npm_version}"
+"$node_bin" "$npm_dir/npx-cli.js" --version >/dev/null
 
 %files
 %license LICENSE
@@ -81,7 +127,19 @@ export PATH="%{buildroot}%{_bindir}:$PATH"
 %{_mandir}/man1/node.1*
 
 %changelog
-* Mon Jun 09 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-2
+* Wed Jun 10 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-3
+- Amazon Linux 2023: build with the co-installable gcc 14 (gcc14-g++); its
+  default gcc 11 and clang 15 are both too old for Node 25's C++20 deps (ada's
+  constexpr std::string and V8's implicit-typename respectively)
+- Fix %%check on Fedora: invoke node directly on npm-cli.js/npx-cli.js instead
+  of the symlinks, whose absolute /usr/bin/node shebang is absent at check time
+- Fix "cannot find -latomic" link failures on EL by shimming the unversioned
+  libatomic.so where only libatomic.so.1 is shipped
+- Select a Python <= 3.14 for configure/gyp so the build works on Fedora
+  rawhide (which ships Python 3.15)
+- Fix bogus changelog date
+
+* Tue Jun 09 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-2
 - Prefer clang but fall back to gcc when clang < 16, so V8's C++20
   implicit-typename code compiles on chroots with older clang (e.g. clang 15
   on Amazon Linux 2023)
