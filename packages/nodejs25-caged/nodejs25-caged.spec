@@ -4,7 +4,7 @@
 
 Name:           nodejs25-caged
 Version:        25.9.0
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Node.js 25 built with V8 pointer compression
 
 License:        MIT
@@ -74,14 +74,26 @@ fi
 %endif
 %{?set_build_flags}
 
+%if 0%{?amzn}
+# Amazon Linux rpm macros add the annobin spec, but the gcc14 packages do not
+# provide a matching annobin plugin in gcc14's plugin path.
+for _var in CFLAGS CXXFLAGS FFLAGS FCFLAGS LDFLAGS; do
+    eval "_value=\${${_var}:-}"
+    _value="$(printf '%s' "$_value" | sed 's@-specs=/usr/lib/rpm/redhat-annobin-cc1@@g')"
+    export "${_var}=${_value}"
+done
+%endif
+
 # Some toolchains (notably EL's gcc-toolset ld) ship only the versioned
 # libatomic.so.1 runtime, not the unversioned libatomic.so linker symlink, so
 # Node's `-latomic` helper targets fail to link with "cannot find -latomic".
-# Provide a local symlink and point the linker at it.
+# Provide a local symlink and point compiler driver library discovery at it;
+# Node's build does not propagate LDFLAGS into every host-tool link.
 atomic_lib="$(ls /usr/lib64/libatomic.so.1 /usr/lib/libatomic.so.1 2>/dev/null | head -n1)"
 if [ -n "$atomic_lib" ]; then
     mkdir -p %{_builddir}/atomic-shim
     ln -sf "$atomic_lib" %{_builddir}/atomic-shim/libatomic.so
+    export LIBRARY_PATH="%{_builddir}/atomic-shim${LIBRARY_PATH:+:$LIBRARY_PATH}"
     export LDFLAGS="${LDFLAGS:-} -L%{_builddir}/atomic-shim"
 fi
 
@@ -127,6 +139,12 @@ npm_dir="%{buildroot}%{_prefix}/lib/node_modules/npm/bin"
 %{_mandir}/man1/node.1*
 
 %changelog
+* Thu Jun 11 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-4
+- Make the libatomic shim visible via LIBRARY_PATH so Node's host-tool links
+  find -latomic even when LDFLAGS is not propagated
+- Strip the annobin rpm spec on Amazon Linux when building with gcc14, whose
+  plugin path does not contain annobin.so
+
 * Wed Jun 10 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-3
 - Amazon Linux 2023: build with the co-installable gcc 14 (gcc14-g++); its
   default gcc 11 and clang 15 are both too old for Node 25's C++20 deps (ada's

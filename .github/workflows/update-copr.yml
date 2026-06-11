@@ -74,6 +74,89 @@ jobs:
             --github-output "$GITHUB_OUTPUT"
         id: upstream
 
+      - name: Detect pushed package changes
+        id: push_changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          output_path = pathlib.Path(os.environ["GITHUB_OUTPUT"])
+          current = json.loads(pathlib.Path("packages.json").read_text(encoding="utf-8"))
+          current_names = [package["name"] for package in current["packages"]]
+          current_by_spec = {
+              f"{package['subdir']}/{package['spec']}": package["name"]
+              for package in current["packages"]
+          }
+          changed = set()
+
+          if os.environ["EVENT_NAME"] == "push":
+              before = os.environ["BEFORE"]
+              after = os.environ["AFTER"]
+              if before and set(before) == {"0"}:
+                  before = f"{after}^"
+              diff = subprocess.run(
+                  [
+                      "git",
+                      "diff",
+                      "--name-only",
+                      before,
+                      after,
+                      "--",
+                      "packages.json",
+                      "packages/*/*.spec",
+                  ],
+                  check=False,
+                  stdout=subprocess.PIPE,
+                  text=True,
+              )
+              changed_files = set(diff.stdout.splitlines())
+              changed.update(
+                  name
+                  for path, name in current_by_spec.items()
+                  if path in changed_files
+              )
+
+              if "packages.json" in changed_files:
+                  previous = subprocess.run(
+                      ["git", "show", f"{before}:packages.json"],
+                      check=False,
+                      stdout=subprocess.PIPE,
+                      text=True,
+                  )
+                  if previous.returncode != 0:
+                      changed.update(current_names)
+                  else:
+                      old = json.loads(previous.stdout)
+                      old_global = {key: value for key, value in old.items() if key != "packages"}
+                      new_global = {
+                          key: value for key, value in current.items() if key != "packages"
+                      }
+                      if old_global != new_global:
+                          changed.update(current_names)
+                      old_packages = {
+                          package["name"]: package for package in old.get("packages", [])
+                      }
+                      new_packages = {
+                          package["name"]: package for package in current["packages"]
+                      }
+                      for name in set(old_packages) | set(new_packages):
+                          if old_packages.get(name) != new_packages.get(name):
+                              changed.add(name)
+
+          changed_packages = ",".join(name for name in current_names if name in changed)
+          with output_path.open("a", encoding="utf-8") as handle:
+              handle.write(f"changed_any={'true' if changed_packages else 'false'}\n")
+              handle.write(f"changed_packages={changed_packages}\n")
+          PY
+
       - name: Commit packaged version bump
         if: steps.upstream.outputs.changed_any == 'true'
         run: |
@@ -161,12 +244,12 @@ jobs:
           uv run python scripts/ensure_copr.py "${umbrella_args[@]}"
 
       - name: Trigger COPR builds
-        if: steps.upstream.outputs.changed_any == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force_build)
+        if: steps.upstream.outputs.changed_any == 'true' || steps.push_changes.outputs.changed_any == 'true' || (github.event_name == 'workflow_dispatch' && inputs.force_build)
         env:
           COPR_OWNER: ${{ vars.COPR_OWNER }}
         run: |
           set -euo pipefail
-          changed_packages=",${{ steps.upstream.outputs.changed_packages }},"
+          changed_packages=",${{ steps.upstream.outputs.changed_packages }},${{ steps.push_changes.outputs.changed_packages }},"
           while IFS= read -r package_json; do
             name="$(jq -r '.name' <<<"$package_json")"
             project="$(jq -r '.project' <<<"$package_json")"

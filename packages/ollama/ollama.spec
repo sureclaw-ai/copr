@@ -4,7 +4,7 @@
 
 Name:           ollama
 Version:        0.30.7
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Local LLM runner and API server
 
 License:        MIT
@@ -56,6 +56,9 @@ done
 %{_prefix}/lib/ollama/
 
 %changelog
+* Thu Jun 11 2026 matt haigh <matthaigh27@gmail.com> - 0.30.7-2
+- Rebuild to recover failed Copr repository generation on fedora-rawhide-aarch64
+
 * Tue Jun 09 2026 Codex Automation <noreply@users.noreply.github.com> - 0.30.7-1
 - Update to v0.30.7
 
