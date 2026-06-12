@@ -4,7 +4,7 @@
 
 Name:           nodejs25-caged
 Version:        25.9.0
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Node.js 25 built with V8 pointer compression
 
 License:        MIT
@@ -88,7 +88,9 @@ done
 # libatomic.so.1 runtime, not the unversioned libatomic.so linker symlink, so
 # Node's `-latomic` helper targets fail to link with "cannot find -latomic".
 # Provide a local symlink and point compiler driver library discovery at it;
-# Node's build does not propagate LDFLAGS into every host-tool link.
+# Node's build does not propagate LDFLAGS into every host-tool link. The same
+# block runs again in %%install, where `make install` re-links the node_js2c
+# host tool in a fresh shell -- keep the two copies in sync.
 atomic_lib="$(ls /usr/lib64/libatomic.so.1 /usr/lib/libatomic.so.1 2>/dev/null | head -n1)"
 if [ -n "$atomic_lib" ]; then
     mkdir -p %{_builddir}/atomic-shim
@@ -113,6 +115,18 @@ export PYTHON
 %make_build
 
 %install
+# rpm runs each section in its own shell, so the libatomic shim and the
+# LIBRARY_PATH/LDFLAGS exports from %%build are gone here. Node's `install`
+# target depends on `all`, which re-links the node_js2c host tool with a bare
+# `-latomic`, so without re-establishing the shim the install fails with
+# "cannot find -latomic" on EL/Amazon Linux. Keep in sync with the %%build copy.
+atomic_lib="$(ls /usr/lib64/libatomic.so.1 /usr/lib/libatomic.so.1 2>/dev/null | head -n1)"
+if [ -n "$atomic_lib" ]; then
+    mkdir -p %{_builddir}/atomic-shim
+    ln -sf "$atomic_lib" %{_builddir}/atomic-shim/libatomic.so
+    export LIBRARY_PATH="%{_builddir}/atomic-shim${LIBRARY_PATH:+:$LIBRARY_PATH}"
+    export LDFLAGS="${LDFLAGS:-} -L%{_builddir}/atomic-shim"
+fi
 %make_install PREFIX=%{_prefix}
 
 %check
@@ -139,6 +153,11 @@ npm_dir="%{buildroot}%{_prefix}/lib/node_modules/npm/bin"
 %{_mandir}/man1/node.1*
 
 %changelog
+* Fri Jun 12 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-5
+- Re-establish the libatomic shim in %%install: rpm runs each section in its own
+  shell, and `make install` re-links the node_js2c host tool, so the %%build env
+  was lost and EL/Amazon Linux failed with "cannot find -latomic" during install
+
 * Thu Jun 11 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-4
 - Make the libatomic shim visible via LIBRARY_PATH so Node's host-tool links
   find -latomic even when LDFLAGS is not propagated
