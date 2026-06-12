@@ -3,8 +3,8 @@
 %global __requires_exclude_from ^%{_prefix}/lib/ollama/.*$
 
 Name:           ollama
-Version:        0.30.7
-Release:        2%{?dist}
+Version:        0.30.8
+Release:        1%{?dist}
 Summary:        Local LLM runner and API server
 
 License:        MIT
@@ -56,6 +56,9 @@ done
 %{_prefix}/lib/ollama/
 
 %changelog
+* Fri Jun 12 2026 Codex Automation <noreply@users.noreply.github.com> - 0.30.8-1
+- Update to v0.30.8
+
 * Thu Jun 11 2026 matt haigh <matthaigh27@gmail.com> - 0.30.7-2
 - Rebuild to recover failed Copr repository generation on fedora-rawhide-aarch64
 
