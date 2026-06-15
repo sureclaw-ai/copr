@@ -58,11 +58,13 @@ enabled.
 %setup -q -n node-v%{version}
 
 %build
-# Node 25 bundles a V8 and an ada URL parser that need a C++20 toolchain:
-# gcc >= 12 or clang >= 16. V8 uses C++20 implicit-typename syntax (P0634,
-# "Down with typename!") that only clang >= 16 accepts, and ada uses constexpr
-# std::string that only gcc >= 12 accepts -- so clang 15 + gcc 11 (both shipped
-# by Amazon Linux 2023) each fail in a different way.
+# Node 25 bundles a V8 and an ada URL parser that need a modern C++20 toolchain:
+# gcc >= 12 or clang >= 19. ada uses constexpr std::string that only gcc >= 12
+# accepts; V8 uses C++20 implicit-typename syntax (P0634, "Down with typename!")
+# that needs clang >= 16; and V8 25's regexp bytecode tables use consteval that
+# clang only compiles at >= 19 (clang 16-18 reject them with "call to immediate
+# function ... is not a constant expression"). So clang 15 + gcc 11 (Amazon
+# Linux 2023) and clang 18 (Azure Linux 3) each fail in a different way.
 %if 0%{?amzn}
 # AL2023: use the co-installable gcc 14 (default gcc 11 / clang 15 are too old).
 export CC=gcc14-gcc CXX=gcc14-g++
@@ -71,15 +73,21 @@ export CC=gcc14-gcc CXX=gcc14-g++
 # Azure Linux 3 ships clang 18, which rejects V8 25's regexp bytecode tables
 # with "call to immediate function ... is not a constant expression" (a stricter
 # consteval diagnostic that newer clang on Fedora/EL does not raise). Its default
-# gcc 13 builds Node 25's C++20 deps fine, so force gcc here.
+# gcc 13 builds Node 25's C++20 deps fine, so force gcc here. NOTE: this is only
+# a fast-path -- COPR's azure-linux-3 buildroot does not always define %%{?azl}
+# (mock injects %%dist but not the azl macro), so the clang >= 19 check below is
+# the real safety net that keeps Azure Linux 3 off its too-old clang 18.
 export CC=gcc CXX=g++
 %else
-# Elsewhere prefer clang when it's new enough (>= 16), else fall back to gcc.
-# Detect the major version via the predefined macro rather than
-# `clang -dumpversion`, which has historically reported a faked gcc-compat
+# Elsewhere pick the compiler at build time: prefer clang only when it is new
+# enough for V8 25 (>= 19; clang 16-18 miscompile V8's consteval regexp tables),
+# otherwise fall back to gcc (>= 12 builds the C++20 deps fine). This >= 19 gate
+# also catches Azure Linux 3 (clang 18, gcc 13) whenever the %%{?azl} fast-path
+# above does not fire. Detect the major version via the predefined macro rather
+# than `clang -dumpversion`, which has historically reported a faked gcc-compat
 # version.
 clang_major="$(echo __clang_major__ | clang -E -P -x c - 2>/dev/null | tr -d '[:space:]')"
-if [ "${clang_major:-0}" -ge 16 ]; then
+if [ "${clang_major:-0}" -ge 19 ]; then
     export CC=clang CXX=clang++
 else
     export CC=gcc CXX=g++
@@ -196,14 +204,19 @@ npm_dir="%{buildroot}%{_prefix}/lib/node_modules/npm/bin"
 
 %changelog
 * Mon Jun 15 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-7
-- Disable RPM's injected LTO (%%global _lto_cflags %%{nil}) on the gcc-using
-  chroots: V8/cppgc's hand-written push_registers asm
-  (PushAllRegistersAndIterateStack) breaks under gcc's -flto, whose ltrans
-  partitioning stage re-emits the asm symbol in more than one partition and
-  fails the assembler with "symbol `PushAllRegistersAndIterateStack' is already
-  defined". This hit amazonlinux-2023 (gcc14) and azure-linux-3 (gcc) at the
-  final link after a full compile; V8 does its own optimization so dropping the
-  distro-default -flto=auto is safe
+- Fix amazonlinux-2023 link failure: disable RPM's injected LTO
+  (%%global _lto_cflags %%{nil}, plus a belt-and-suspenders -flto scrub).
+  V8/cppgc's hand-written push_registers asm (PushAllRegistersAndIterateStack)
+  breaks under gcc's -flto=auto, whose ltrans partitioning stage re-emits the
+  asm symbol in more than one partition and fails the assembler with
+  "symbol `PushAllRegistersAndIterateStack' is already defined". V8 does its own
+  optimization so dropping the distro-default LTO is safe
+- Actually keep Azure Linux 3 off clang 18: the 25.9.0-6 %%{?azl} gcc-switch
+  never fired because COPR's azure-linux-3 buildroot does not define the azl
+  macro (mock injects %%dist but not %%azl), so the build fell back to clang 18
+  and failed compiling V8 25's regexp consteval bytecode tables. Raise the
+  clang-fallback threshold from >= 16 to >= 19 (V8 25's real minimum) so clang
+  18 falls back to gcc 13 regardless of whether the %%{?azl} fast-path fires
 
 * Sat Jun 13 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-6
 - Fix the annobin-spec strip on Amazon Linux: the sed targeted
