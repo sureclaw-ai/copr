@@ -2,9 +2,15 @@
 %global nodejs_major 25
 %global npm_version 11.12.1
 
+# V8/cppgc bundles hand-written assembly (e.g. the PushAllRegistersAndIterateStack
+# stack-scanning trampoline) that breaks under the distro-default -flto: gcc's LTO
+# ltrans stage re-emits the asm symbol across partitions and fails with
+# "symbol ... is already defined". V8 does its own optimization; disable RPM LTO.
+%global _lto_cflags %{nil}
+
 Name:           nodejs25-caged
 Version:        25.9.0
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Node.js 25 built with V8 pointer compression
 
 License:        MIT
@@ -52,11 +58,13 @@ enabled.
 %setup -q -n node-v%{version}
 
 %build
-# Node 25 bundles a V8 and an ada URL parser that need a C++20 toolchain:
-# gcc >= 12 or clang >= 16. V8 uses C++20 implicit-typename syntax (P0634,
-# "Down with typename!") that only clang >= 16 accepts, and ada uses constexpr
-# std::string that only gcc >= 12 accepts -- so clang 15 + gcc 11 (both shipped
-# by Amazon Linux 2023) each fail in a different way.
+# Node 25 bundles a V8 and an ada URL parser that need a modern C++20 toolchain:
+# gcc >= 12 or clang >= 19. ada uses constexpr std::string that only gcc >= 12
+# accepts; V8 uses C++20 implicit-typename syntax (P0634, "Down with typename!")
+# that needs clang >= 16; and V8 25's regexp bytecode tables use consteval that
+# clang only compiles at >= 19 (clang 16-18 reject them with "call to immediate
+# function ... is not a constant expression"). So clang 15 + gcc 11 (Amazon
+# Linux 2023) and clang 18 (Azure Linux 3) each fail in a different way.
 %if 0%{?amzn}
 # AL2023: use the co-installable gcc 14 (default gcc 11 / clang 15 are too old).
 export CC=gcc14-gcc CXX=gcc14-g++
@@ -65,15 +73,21 @@ export CC=gcc14-gcc CXX=gcc14-g++
 # Azure Linux 3 ships clang 18, which rejects V8 25's regexp bytecode tables
 # with "call to immediate function ... is not a constant expression" (a stricter
 # consteval diagnostic that newer clang on Fedora/EL does not raise). Its default
-# gcc 13 builds Node 25's C++20 deps fine, so force gcc here.
+# gcc 13 builds Node 25's C++20 deps fine, so force gcc here. NOTE: this is only
+# a fast-path -- COPR's azure-linux-3 buildroot does not always define %%{?azl}
+# (mock injects %%dist but not the azl macro), so the clang >= 19 check below is
+# the real safety net that keeps Azure Linux 3 off its too-old clang 18.
 export CC=gcc CXX=g++
 %else
-# Elsewhere prefer clang when it's new enough (>= 16), else fall back to gcc.
-# Detect the major version via the predefined macro rather than
-# `clang -dumpversion`, which has historically reported a faked gcc-compat
+# Elsewhere pick the compiler at build time: prefer clang only when it is new
+# enough for V8 25 (>= 19; clang 16-18 miscompile V8's consteval regexp tables),
+# otherwise fall back to gcc (>= 12 builds the C++20 deps fine). This >= 19 gate
+# also catches Azure Linux 3 (clang 18, gcc 13) whenever the %%{?azl} fast-path
+# above does not fire. Detect the major version via the predefined macro rather
+# than `clang -dumpversion`, which has historically reported a faked gcc-compat
 # version.
 clang_major="$(echo __clang_major__ | clang -E -P -x c - 2>/dev/null | tr -d '[:space:]')"
-if [ "${clang_major:-0}" -ge 16 ]; then
+if [ "${clang_major:-0}" -ge 19 ]; then
     export CC=clang CXX=clang++
 else
     export CC=gcc CXX=g++
@@ -91,6 +105,24 @@ for _var in CFLAGS CXXFLAGS FFLAGS FCFLAGS LDFLAGS; do
     export "${_var}=${_value}"
 done
 %endif
+
+# Belt-and-suspenders LTO scrub. V8/cppgc bundles hand-written assembly (the
+# PushAllRegistersAndIterateStack stack-scanning trampoline) that breaks under
+# -flto: gcc's LTO ltrans partitioning stage re-emits the asm symbol across
+# partitions and fails the assembler with "symbol ... is already defined". The
+# %%global _lto_cflags %%{nil} above removes the flag where it comes from RPM's
+# _lto_cflags (Amazon Linux 2023), but in case any -flto reaches the effective
+# flags by another path, strip every -flto/-ffat-lto-objects token here too.
+# This is a no-op when no LTO flag is present (e.g. the clang chroots and Azure
+# Linux 3, whose default flags carry no -flto). Keep in sync with the %%install
+# copy, where `make install` re-links host tools in a fresh shell. The pattern
+# matches -flto, -flto=auto, -ffat-lto-objects and -fno-lto while leaving other
+# -f... flags intact.
+for _var in CFLAGS CXXFLAGS FFLAGS FCFLAGS LDFLAGS; do
+    eval "_value=\${${_var}:-}"
+    _value="$(printf '%s' "$_value" | sed -E 's@ *-f(no-)?(fat-)?lto([=-][^ ]*)?@@g')"
+    export "${_var}=${_value}"
+done
 
 # Some toolchains (notably EL's gcc-toolset ld) ship only the versioned
 # libatomic.so.1 runtime, not the unversioned libatomic.so linker symlink, so
@@ -135,6 +167,16 @@ if [ -n "$atomic_lib" ]; then
     export LIBRARY_PATH="%{_builddir}/atomic-shim${LIBRARY_PATH:+:$LIBRARY_PATH}"
     export LDFLAGS="${LDFLAGS:-} -L%{_builddir}/atomic-shim"
 fi
+
+# `make install` depends on `all` and re-links host tools, so mirror the %%build
+# LTO scrub here too: strip any -flto/-ffat-lto-objects token that would
+# re-trigger the V8 cppgc "PushAllRegistersAndIterateStack already defined"
+# assembler failure. No-op when no LTO flag is present. Keep in sync with %%build.
+for _var in CFLAGS CXXFLAGS FFLAGS FCFLAGS LDFLAGS; do
+    eval "_value=\${${_var}:-}"
+    _value="$(printf '%s' "$_value" | sed -E 's@ *-f(no-)?(fat-)?lto([=-][^ ]*)?@@g')"
+    export "${_var}=${_value}"
+done
 %make_install PREFIX=%{_prefix}
 
 %check
@@ -161,6 +203,21 @@ npm_dir="%{buildroot}%{_prefix}/lib/node_modules/npm/bin"
 %{_mandir}/man1/node.1*
 
 %changelog
+* Mon Jun 15 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-7
+- Fix amazonlinux-2023 link failure: disable RPM's injected LTO
+  (%%global _lto_cflags %%{nil}, plus a belt-and-suspenders -flto scrub).
+  V8/cppgc's hand-written push_registers asm (PushAllRegistersAndIterateStack)
+  breaks under gcc's -flto=auto, whose ltrans partitioning stage re-emits the
+  asm symbol in more than one partition and fails the assembler with
+  "symbol `PushAllRegistersAndIterateStack' is already defined". V8 does its own
+  optimization so dropping the distro-default LTO is safe
+- Actually keep Azure Linux 3 off clang 18: the 25.9.0-6 %%{?azl} gcc-switch
+  never fired because COPR's azure-linux-3 buildroot does not define the azl
+  macro (mock injects %%dist but not %%azl), so the build fell back to clang 18
+  and failed compiling V8 25's regexp consteval bytecode tables. Raise the
+  clang-fallback threshold from >= 16 to >= 19 (V8 25's real minimum) so clang
+  18 falls back to gcc 13 regardless of whether the %%{?azl} fast-path fires
+
 * Sat Jun 13 2026 matt haigh <matthaigh27@gmail.com> - 25.9.0-6
 - Fix the annobin-spec strip on Amazon Linux: the sed targeted
   /usr/lib/rpm/redhat-annobin-cc1 but the real flag is
