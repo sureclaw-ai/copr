@@ -74,7 +74,8 @@ The workflow runs daily at `00:15` UTC, on pushes to `main`, and can also be sta
 ## Notes
 
 - The COPR project chroots are synced from the live `copr-cli list-chroots` output, filtered to chroots whose architecture appears in `packages.json`, then filtered again by excluded distro IDs or distro prefixes from the global `chroot_exclude_distros` list.
-- All tracked packages currently target `aarch64` and `x86_64`, excluding `alma-kitten+epel-10-*`, `almalinux-kitten-10-*`, `centos-stream+epel-next-8-*`, `centos-stream-8`, `custom-*`, `epel-7`, `fedora-eln-*`, `mageia-*`, `openeuler-*`, `rhel-7`, and `rhel-8`.
+- All tracked packages currently target `aarch64` and `x86_64`, excluding `alma-kitten+epel-10-*`, `almalinux-kitten-10-*`, `centos-stream+epel-next-8-*`, `centos-stream-8`, `custom-*`, `epel-7`, `fedora-eln-*`, `mageia-*`, `openeuler-*`, `opensuse-tumbleweed-*`, `rhel-7`, and `rhel-8`.
+- `opensuse-tumbleweed-*` is excluded as a temporary workaround for a COPR/openSUSE infrastructure regression: Tumbleweed's `dnf5` ships `repo_gpgcheck = 1` as a main-config default, so the buildroot's auto-injected `copr_base` repo demands a signed `repodata/repomd.xml.asc`, which COPR's openSUSE Pulp backend currently serves as `404` (the signature is absent on every chroot, but only Tumbleweed's `dnf5` enforces it — `opensuse-leap-15.6` still uses `dnf4` and builds fine). This broke buildroot setup before `%prep` for every package, so it could not be worked around in the spec files. Re-add the chroot once COPR signs openSUSE repo metadata (or once `repo_gpgcheck` is no longer enforced on `copr_base`).
 - `gogcli` uses vendored Go modules.
 - `wacli` uses vendored Go modules and follows the upstream CGO `sqlite_fts5` build configuration so the local message index keeps FTS5 enabled.
 - `codex` uses the upstream Linux musl release artifacts and depends on the Fedora `bubblewrap` and `ripgrep` packages instead of bundling `rg`.
