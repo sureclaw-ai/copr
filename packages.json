@@ -13,7 +13,8 @@
     "fedora-eln",
     "almalinux-kitten-10",
     "alma-kitten+epel-10",
-    "openeuler"
+    "openeuler",
+    "opensuse-tumbleweed"
   ],
   "packages": [
     {
