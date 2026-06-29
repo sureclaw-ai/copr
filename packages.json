@@ -42,7 +42,8 @@
       "subdir": "packages/codex",
       "spec": "codex.spec",
       "upstream_url": "https://github.com/openai/codex.git",
-      "tag_prefix": "rust-v"
+      "tag_prefix": "rust-v",
+      "version_source": "github_release"
     },
     {
       "chroot_arches": ["aarch64", "x86_64"],
