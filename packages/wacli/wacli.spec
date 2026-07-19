@@ -2,7 +2,7 @@
 
 Name:           wacli
 Version:        0.13.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        WhatsApp CLI for sync, search, and send
 
 License:        MIT
@@ -21,6 +21,14 @@ messages from the terminal.
 
 %prep
 %autosetup -n %{name}-%{version} -a1
+# Some targets (openSUSE Leap 15.6, Amazon Linux 2023) ship a Go patch release
+# older than the one upstream pins in the go.mod "go" directive, so the build
+# fails with "go.mod requires go >= X (running go Y; GOTOOLCHAIN=local)". Go
+# patch releases add no language features, so relax the directive to its minor
+# version (and drop any toolchain pin) to let the distro's local Go build
+# without a GOTOOLCHAIN download. All vendored dependencies require <= go 1.24.
+sed -i -E 's/^go ([0-9]+\.[0-9]+)\.[0-9]+$/go \1/' go.mod
+sed -i -E '/^toolchain /d' go.mod
 
 %build
 export CGO_ENABLED=1
@@ -45,6 +53,10 @@ install -Dpm0755 wacli %{buildroot}%{_bindir}/wacli
 %{_bindir}/wacli
 
 %changelog
+* Sun Jul 19 2026 matt haigh <matthaigh27@gmail.com> - 0.13.0-2
+- Relax the go.mod Go patch pin at build time so targets shipping an older Go
+  (openSUSE Leap 15.6, Amazon Linux 2023) build without a toolchain download
+
 * Sat Jul 18 2026 Codex Automation <noreply@users.noreply.github.com> - 0.13.0-1
 - Update to v0.13.0
 
