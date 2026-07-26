@@ -4,7 +4,7 @@
 
 Name:           ollama
 Version:        0.32.4
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Local LLM runner and API server
 
 License:        MIT
@@ -56,6 +56,14 @@ done
 %{_prefix}/lib/ollama/
 
 %changelog
+* Sun Jul 26 2026 matt haigh <matthaigh27@gmail.com> - 0.32.4-2
+- Rebuild to recover failed Copr repository generation on
+  amazonlinux-2023-aarch64, amazonlinux-2023-x86_64, epel-9-x86_64,
+  fedora-rawhide-aarch64, and opensuse-leap-16.0-x86_64. The builders
+  emitted the RPMs but were terminated before writing the success
+  marker or builder-live.log (resource pressure from the ~1.3 GB
+  payload), so the chroots were left failed. No spec logic changes.
+
 * Sun Jul 26 2026 Codex Automation <noreply@users.noreply.github.com> - 0.32.4-1
 - Update to v0.32.4
 
