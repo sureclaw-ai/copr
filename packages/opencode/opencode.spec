@@ -2,7 +2,7 @@
 
 Name:           opencode
 Version:        1.18.5
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Open source AI coding agent for the terminal
 
 License:        MIT
@@ -38,6 +38,14 @@ install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
 %{_bindir}/opencode
 
 %changelog
+* Sun Jul 26 2026 matt haigh <matthaigh27@gmail.com> - 1.18.5-2
+- Rebuild to recover the 1.18.5-1 Copr build, which the frontend marked
+  failed on 10 chroots even though each of those chroots wrote a
+  "success" marker plus the finished RPM and kept a complete
+  builder-live.log. All ten failed chroots ended within seconds of each
+  other ~24h after submission, pointing at a Copr queue/timeout event
+  rather than a build defect. No spec logic changes.
+
 * Sat Jul 25 2026 Codex Automation <noreply@users.noreply.github.com> - 1.18.5-1
 - Update to v1.18.5
 
