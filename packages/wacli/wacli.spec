@@ -2,7 +2,7 @@
 
 Name:           wacli
 Version:        0.15.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        WhatsApp CLI for sync, search, and send
 
 License:        MIT
@@ -45,6 +45,13 @@ install -Dpm0755 wacli %{buildroot}%{_bindir}/wacli
 %{_bindir}/wacli
 
 %changelog
+* Sun Jul 26 2026 matt haigh <matthaigh27@gmail.com> - 0.15.0-2
+- Rebuild to recover the failed Copr build on opensuse-leap-16.0 (both
+  arches). The buildroot GPG check failed because the openSUSE Project
+  Signing Key 0x29B700A4 had expired on 2026-06-19; the renewed key
+  (valid to 2030-05-27) now ships in distribution-gpg-keys on the Copr
+  builders, so a rebuild passes the check.
+
 * Fri Jul 24 2026 Codex Automation <noreply@users.noreply.github.com> - 0.15.0-1
 - Update to v0.15.0
 
