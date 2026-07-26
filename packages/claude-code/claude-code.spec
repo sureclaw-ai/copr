@@ -9,7 +9,7 @@
 
 Name:           claude-code
 Version:        2.1.220
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Anthropic Claude Code terminal assistant
 
 License:        LicenseRef-Anthropic-Claude-Code
@@ -46,6 +46,14 @@ install -Dpm0755 %{SOURCE2} %{buildroot}%{_bindir}/claude
 %{_bindir}/claude
 
 %changelog
+* Sun Jul 26 2026 matt haigh <matthaigh27@gmail.com> - 2.1.220-2
+- Rebuild to recover the 2.1.220-1 Copr build, which the frontend marked
+  failed on 6 chroots even though each of those chroots wrote a
+  "success" marker plus the finished RPM and kept a complete
+  builder-live.log. The failed chroots ended within seconds of each
+  other ~24h after submission, matching the same Copr queue/timeout
+  event that hit opencode, not a build defect. No spec logic changes.
+
 * Sat Jul 25 2026 Codex Automation <noreply@users.noreply.github.com> - 2.1.220-1
 - Update to v2.1.220
 
