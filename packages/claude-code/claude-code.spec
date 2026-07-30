@@ -9,7 +9,7 @@
 
 Name:           claude-code
 Version:        2.1.220
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Anthropic Claude Code terminal assistant
 
 License:        LicenseRef-Anthropic-Claude-Code
@@ -46,6 +46,15 @@ install -Dpm0755 %{SOURCE2} %{buildroot}%{_bindir}/claude
 %{_bindir}/claude
 
 %changelog
+* Thu Jul 30 2026 SureClaw COPR <noreply@users.noreply.github.com> - 2.1.220-2
+- Rebuild to republish six chroots (centos-stream-10 aarch64/x86_64,
+  epel-10-aarch64, fedora-rawhide-aarch64, rhel+epel-10 aarch64/x86_64) that
+  COPR recorded as failed in build #10772337. The rpmbuild actually completed
+  on every one of them - each result directory holds a "success" marker and the
+  built RPM - so this was a COPR backend state desync, not a packaging defect.
+  Because COPR omits failed chroots from the published repository, 2.1.220 was
+  left unavailable there; a clean rebuild republishes it.
+
 * Sat Jul 25 2026 Codex Automation <noreply@users.noreply.github.com> - 2.1.220-1
 - Update to v2.1.220
 
