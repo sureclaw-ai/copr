@@ -9,7 +9,7 @@
 
 Name:           claude-code
 Version:        2.1.220
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Anthropic Claude Code terminal assistant
 
 License:        LicenseRef-Anthropic-Claude-Code
@@ -46,6 +46,14 @@ install -Dpm0755 %{SOURCE2} %{buildroot}%{_bindir}/claude
 %{_bindir}/claude
 
 %changelog
+* Fri Jul 31 2026 Copr Maintenance <noreply@users.noreply.github.com> - 2.1.220-2
+- Rebuild to recover the centos-stream-10, epel-10, rhel+epel-10 and
+  fedora-rawhide chroots. The 2.1.220-1 binary RPMs built, passed %%check and
+  were signed successfully; the builds were then marked failed only because the
+  Copr backend's Pulp signing task (signed_add_and_remove) stayed queued for
+  ~24h without a worker and timed out. Transient build-farm issue, no packaging
+  change.
+
 * Sat Jul 25 2026 Codex Automation <noreply@users.noreply.github.com> - 2.1.220-1
 - Update to v2.1.220
 
