@@ -2,7 +2,7 @@
 
 Name:           wacli
 Version:        0.15.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        WhatsApp CLI for sync, search, and send
 
 License:        MIT
@@ -45,6 +45,12 @@ install -Dpm0755 wacli %{buildroot}%{_bindir}/wacli
 %{_bindir}/wacli
 
 %changelog
+* Fri Jul 31 2026 Copr Maintenance <noreply@users.noreply.github.com> - 0.15.0-2
+- Rebuild to recover the opensuse-leap-16.0 chroots; the 0.15.0-1 build failed
+  only there because the buildroot's openSUSE package-signing key had expired
+  (a transient distribution-gpg-keys issue on the Copr builders, since fixed).
+  No source or packaging change; golang >= 1.25 resolves on Leap 16.0 via go1.25.
+
 * Fri Jul 24 2026 Codex Automation <noreply@users.noreply.github.com> - 0.15.0-1
 - Update to v0.15.0
 
