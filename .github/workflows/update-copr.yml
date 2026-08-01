@@ -268,3 +268,11 @@ jobs:
               uv run copr-cli build-package "${COPR_OWNER}/${project}" --name "${name}" --background --nowait
             fi
           done < <(jq -c '.packages[]' packages.json)
+
+      - name: Resubmit transiently-failed COPR builds
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          COPR_OWNER: ${{ vars.COPR_OWNER }}
+        run: |
+          set -euo pipefail
+          uv run python scripts/resubmit_failed.py --owner "$COPR_OWNER"

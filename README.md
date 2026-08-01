@@ -42,6 +42,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 - `scripts/make_npm_srpm.sh`: downloads an npm package tarball and emits an SRPM
 - `scripts/make_python_srpm.sh`: clones an upstream Python project tag and emits an SRPM
 - `scripts/ensure_copr.py`: creates or updates the COPR project and package source definition
+- `scripts/resubmit_failed.py`: resubmits packages whose latest COPR build failed transiently, bounded per version
 - `.github/workflows/update-copr.yml`: daily upstream check, rebuild on pushes to `main`, plus optional manual rebuild
 
 ## GitHub configuration
