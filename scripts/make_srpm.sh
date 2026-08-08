@@ -68,6 +68,50 @@ if [ -n "$go_version_compat" ]; then
     echo "GO_VERSION_COMPAT was set but ${srcdir}/go.mod does not exist" >&2
     exit 1
   fi
+  # Drop `tool` and `toolchain` directives before resolving the module graph.
+  # `tool` directives (e.g. code generators such as sqlc) are never imported by
+  # the built binary and their generated output is committed upstream, but they
+  # can drag in dependencies that demand a newer Go than the target chroots
+  # ship. Removing them lets `go mod tidy` prune those dependencies so the
+  # module can be built and vendored with the compat toolchain. The `go`
+  # directive itself is pinned to $go_version_compat after tidy/vendor (below),
+  # because `go mod tidy` would otherwise re-bump it to the graph's maximum.
+  go_mod_tmp="${srcdir}/go.mod.tmp"
+  awk '
+    BEGIN { in_tool_block = 0 }
+    in_tool_block { if ($0 ~ /^\)/) in_tool_block = 0; next }
+    /^tool \(/ { in_tool_block = 1; next }
+    /^tool[ \t]/ { next }
+    /^toolchain[ \t]/ { next }
+    { print }
+  ' "${srcdir}/go.mod" >"$go_mod_tmp"
+  mv "$go_mod_tmp" "${srcdir}/go.mod"
+fi
+
+printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
+printf '%s\n' "$date" >"${srcdir}/.copr-date"
+rm -rf "${srcdir}/.git"
+
+(
+  cd "$srcdir"
+  export GOFLAGS="-mod=mod"
+  export GOWORK=off
+  go mod tidy
+)
+
+(
+  cd "$srcdir"
+  export GOFLAGS="-mod=mod"
+  export GOWORK=off
+  go mod vendor
+)
+
+if [ -n "$go_version_compat" ]; then
+  # Pin the `go` directive to the compat version now that the graph is resolved
+  # and vendored. Doing this after `go mod vendor` (rather than before) is
+  # required: `go mod tidy` re-bumps the directive to the graph maximum, and
+  # `go mod vendor` refuses to run against a directive lower than that maximum.
+  # Once vendored, the older toolchain builds the tree fine with -mod=vendor.
   go_mod_tmp="${srcdir}/go.mod.tmp"
   awk -v compat="$go_version_compat" '
     /^go [0-9]+\.[0-9]+(\.[0-9]+)?$/ && !updated {
@@ -85,25 +129,8 @@ if [ -n "$go_version_compat" ]; then
   mv "$go_mod_tmp" "${srcdir}/go.mod"
 fi
 
-printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
-printf '%s\n' "$date" >"${srcdir}/.copr-date"
-rm -rf "${srcdir}/.git"
-
-(
-  cd "$srcdir"
-  export GOFLAGS="-mod=mod"
-  export GOWORK=off
-  go mod tidy
-)
-
-tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
-
-(
-  cd "$srcdir"
-  export GOFLAGS="-mod=mod"
-  export GOWORK=off
-  go mod vendor
-)
+tar -C "$workdir" --exclude="${package_name}-${version}/vendor" \
+  -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
 
 tar -C "$srcdir" -czf "${sources_dir}/${package_name}-${version}-vendor.tar.gz" vendor
 
