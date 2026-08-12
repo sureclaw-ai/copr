@@ -13,6 +13,7 @@ package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/openclaw/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 go_version_compat="${GO_VERSION_COMPAT:-}"
+go_drop_tools="${GO_DROP_TOOLS:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -63,7 +64,29 @@ git clone --depth 1 --branch "$tag" "$upstream_url" "$srcdir"
 commit="$(git -C "$srcdir" rev-parse --short=12 HEAD)"
 date="$(TZ=UTC git -C "$srcdir" log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd HEAD)"
 
-if [ -n "$go_version_compat" ]; then
+# Drop Go `tool` directives that exist only for code generation and are not
+# needed to build the packaged binary. Left in place they pull in modules
+# (and their own `go` requirements) that can force this module's go directive
+# — and thus the required toolchain — higher than some target chroots provide.
+if [ -n "$go_drop_tools" ]; then
+  if [ ! -f "${srcdir}/go.mod" ]; then
+    echo "GO_DROP_TOOLS was set but ${srcdir}/go.mod does not exist" >&2
+    exit 1
+  fi
+  for go_tool in $go_drop_tools; do
+    (cd "$srcdir" && go mod edit -droptool="$go_tool")
+  done
+fi
+
+# Pin the go directive in go.mod to the compat version. Applied both before and
+# after `go mod tidy`/`go mod vendor`: before so the module graph resolves the
+# same way it always has, and again after because tidy/vendor can raise the
+# directive to satisfy dependencies. Target chroots on an older Go (for example
+# fedora-43 and amazonlinux-2023 on Go 1.25) rely on the final value to clear
+# the `go.mod requires go >= X` toolchain gate; the packaged binary itself only
+# needs the compat version to compile.
+pin_go_directive() {
+  [ -n "$go_version_compat" ] || return 0
   if [ ! -f "${srcdir}/go.mod" ]; then
     echo "GO_VERSION_COMPAT was set but ${srcdir}/go.mod does not exist" >&2
     exit 1
@@ -83,7 +106,9 @@ if [ -n "$go_version_compat" ]; then
     exit 1
   }
   mv "$go_mod_tmp" "${srcdir}/go.mod"
-fi
+}
+
+pin_go_directive
 
 printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
 printf '%s\n' "$date" >"${srcdir}/.copr-date"
@@ -94,17 +119,12 @@ rm -rf "${srcdir}/.git"
   export GOFLAGS="-mod=mod"
   export GOWORK=off
   go mod tidy
-)
-
-tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
-
-(
-  cd "$srcdir"
-  export GOFLAGS="-mod=mod"
-  export GOWORK=off
   go mod vendor
 )
 
+pin_go_directive
+
+tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
 tar -C "$srcdir" -czf "${sources_dir}/${package_name}-${version}-vendor.tar.gz" vendor
 
 rpmbuild -bs "$spec" \
