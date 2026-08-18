@@ -13,6 +13,8 @@ package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/openclaw/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 go_version_compat="${GO_VERSION_COMPAT:-}"
+go_drop_tools="${GO_DROP_TOOLS:-}"
+go_drop_requires="${GO_DROP_REQUIRES:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -83,6 +85,27 @@ if [ -n "$go_version_compat" ]; then
     exit 1
   }
   mv "$go_mod_tmp" "${srcdir}/go.mod"
+fi
+
+# Drop codegen-only `tool` directives (and the module requires they pull in)
+# before tidy/vendor. A tool such as sqlc is only needed to regenerate committed
+# code; it is never compiled into the packaged binary, but its own go.mod can
+# demand a newer Go toolchain than the target chroots ship. Leaving it in the
+# module graph makes `go build` fail under GOTOOLCHAIN=local on those chroots.
+if [ -n "$go_drop_tools" ] || [ -n "$go_drop_requires" ]; then
+  if [ ! -f "${srcdir}/go.mod" ]; then
+    echo "GO_DROP_TOOLS/GO_DROP_REQUIRES was set but ${srcdir}/go.mod does not exist" >&2
+    exit 1
+  fi
+  (
+    cd "$srcdir"
+    for tool in $go_drop_tools; do
+      go mod edit -droptool="$tool"
+    done
+    for req in $go_drop_requires; do
+      go mod edit -droprequire="$req"
+    done
+  )
 fi
 
 printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
