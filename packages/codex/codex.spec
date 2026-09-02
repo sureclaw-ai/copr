@@ -1,6 +1,8 @@
 %global debug_package %{nil}
 
 Name:           codex
+Version:        0.152.0
+Release:        2%{?dist}
 Version:        0.152.1
 Release:        1%{?dist}
 Summary:        Coding agent that runs locally in your terminal
@@ -23,15 +25,17 @@ Codex CLI is a coding agent from OpenAI that runs locally in your terminal.
 tar -xzf %{SOURCE2}
 %ifarch x86_64
 tar -xzf %{SOURCE0}
-mv codex-x86_64-unknown-linux-musl codex
 %endif
 %ifarch aarch64
 tar -xzf %{SOURCE1}
-mv codex-aarch64-unknown-linux-musl codex
 %endif
 
 %install
-install -Dpm0755 codex %{buildroot}%{_bindir}/codex
+# The upstream codex-package archive also bundles rg, bwrap and zsh under
+# codex-path/ and codex-resources/; those are provided by the ripgrep and
+# bubblewrap runtime dependencies (and the system zsh) instead.
+install -Dpm0755 bin/codex %{buildroot}%{_bindir}/codex
+install -Dpm0755 bin/codex-code-mode-host %{buildroot}%{_bindir}/codex-code-mode-host
 
 %check
 %{buildroot}%{_bindir}/codex --version >/dev/null
@@ -40,8 +44,13 @@ install -Dpm0755 codex %{buildroot}%{_bindir}/codex
 %license LICENSE NOTICE
 %doc README.md
 %{_bindir}/codex
+%{_bindir}/codex-code-mode-host
 
 %changelog
+* Tue Sep 01 2026 David <david@example.com> - 0.152.0-2
+- Switch to the upstream codex-package release archives and ship
+  codex-code-mode-host next to codex; without it code mode fails with
+  "failed to spawn code-mode host" (openai/codex#31906)
 * Wed Sep 02 2026 Codex Automation <noreply@users.noreply.github.com> - 0.152.1-1
 - Update to v0.152.1
 
