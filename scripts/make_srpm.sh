@@ -63,18 +63,33 @@ git clone --depth 1 --branch "$tag" "$upstream_url" "$srcdir"
 commit="$(git -C "$srcdir" rev-parse --short=12 HEAD)"
 date="$(TZ=UTC git -C "$srcdir" log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd HEAD)"
 
-if [ -n "$go_version_compat" ]; then
+# Pin the go directive down to a version that every target chroot ships.
+#
+# This must run BOTH before and after `go mod tidy`: some upstreams pull in a
+# build-time `tool` dependency (e.g. sqlc) that declares a newer `go` directive,
+# and `go mod tidy` raises the main module's `go` line to match. Rewriting only
+# once (before tidy) is silently undone, so the shipped go.mod ends up requiring
+# a toolchain the older chroots (and sometimes the SRPM builder) don't have,
+# which is exactly what breaks the build. Re-applying after tidy guarantees the
+# go.mod that lands in the source tarball is the compat version.
+rewrite_go_compat() {
+  if [ -z "$go_version_compat" ]; then
+    return 0
+  fi
   if [ ! -f "${srcdir}/go.mod" ]; then
     echo "GO_VERSION_COMPAT was set but ${srcdir}/go.mod does not exist" >&2
     exit 1
   fi
   go_mod_tmp="${srcdir}/go.mod.tmp"
+  # Rewrite the `go` directive to the compat version and drop any `toolchain`
+  # line so the chroot build does not try to fetch a newer toolchain offline.
   awk -v compat="$go_version_compat" '
     /^go [0-9]+\.[0-9]+(\.[0-9]+)?$/ && !updated {
       print "go " compat
       updated = 1
       next
     }
+    /^toolchain / { next }
     { print }
     END { if (!updated) exit 2 }
   ' "${srcdir}/go.mod" >"$go_mod_tmp" || {
@@ -83,7 +98,34 @@ if [ -n "$go_version_compat" ]; then
     exit 1
   }
   mv "$go_mod_tmp" "${srcdir}/go.mod"
-fi
+}
+
+# Drop `tool` directives from go.mod. Tool dependencies are build-time code
+# generators (e.g. sqlc) that the RPM build never runs, but they can declare a
+# much newer `go` directive that drags the whole module's required go version up
+# past what the target chroots ship. Removing them lets `go mod tidy` prune the
+# tool-only dependency subtree so the module builds on the compat toolchain.
+# Only done when GO_VERSION_COMPAT is set (the opt-in "build on older go" path).
+strip_go_tools() {
+  if [ -z "$go_version_compat" ]; then
+    return 0
+  fi
+  if [ ! -f "${srcdir}/go.mod" ]; then
+    return 0
+  fi
+  go_mod_tmp="${srcdir}/go.mod.tmp"
+  awk '
+    /^tool \(/ { intool = 1; next }
+    intool && /^\)/ { intool = 0; next }
+    intool { next }
+    /^tool / { next }
+    { print }
+  ' "${srcdir}/go.mod" >"$go_mod_tmp"
+  mv "$go_mod_tmp" "${srcdir}/go.mod"
+}
+
+strip_go_tools
+rewrite_go_compat
 
 printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
 printf '%s\n' "$date" >"${srcdir}/.copr-date"
@@ -93,8 +135,25 @@ rm -rf "${srcdir}/.git"
   cd "$srcdir"
   export GOFLAGS="-mod=mod"
   export GOWORK=off
+  # Allow fetching the toolchain a dependency's go directive may require; the
+  # shipped go.mod is pinned back down to the compat version immediately after.
+  export GOTOOLCHAIN="${GOTOOLCHAIN:-auto}"
   go mod tidy
 )
+
+if [ -n "$go_version_compat" ]; then
+  # Pruning the tool dependencies above can transiently raise the `go` directive
+  # while `go mod tidy` reconciles the graph. Pin it back down and tidy once more
+  # so go.mod/go.sum are self-consistent at the compat version before vendoring.
+  rewrite_go_compat
+  (
+    cd "$srcdir"
+    export GOFLAGS="-mod=mod"
+    export GOWORK=off
+    export GOTOOLCHAIN="${GOTOOLCHAIN:-auto}"
+    go mod tidy
+  )
+fi
 
 tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
 
@@ -102,6 +161,7 @@ tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${pac
   cd "$srcdir"
   export GOFLAGS="-mod=mod"
   export GOWORK=off
+  export GOTOOLCHAIN="${GOTOOLCHAIN:-auto}"
   go mod vendor
 )
 
