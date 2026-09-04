@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           gogcli
-Version:        0.38.3
+Version:        0.39.0
 Release:        1%{?dist}
 Summary:        Google Workspace CLI for the terminal
 
@@ -51,6 +51,9 @@ install -Dpm0755 gog %{buildroot}%{_bindir}/gog
 %{_bindir}/gog
 
 %changelog
+* Fri Sep 04 2026 Codex Automation <noreply@users.noreply.github.com> - 0.39.0-1
+- Update to v0.39.0
+
 * Thu Sep 03 2026 Codex Automation <noreply@users.noreply.github.com> - 0.38.3-1
 - Update to v0.38.3
 
