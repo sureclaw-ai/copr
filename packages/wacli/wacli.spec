@@ -2,7 +2,7 @@
 
 Name:           wacli
 Version:        0.17.2
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        WhatsApp CLI for sync, search, and send
 
 License:        MIT
@@ -11,7 +11,7 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
 BuildRequires:  gcc
-BuildRequires:  golang >= 1.25
+BuildRequires:  golang >= 1.26
 ExclusiveArch:  aarch64 x86_64
 
 %description
@@ -45,6 +45,13 @@ install -Dpm0755 wacli %{buildroot}%{_bindir}/wacli
 %{_bindir}/wacli
 
 %changelog
+* Sun Sep 06 2026 Codex Automation <noreply@users.noreply.github.com> - 0.17.2-2
+- Require Go >= 1.26 to match upstream module and dependency requirements
+- Rewrite the go.mod directive to 1.26 during SRPM generation so the Fedora
+  source builder (Go 1.26.7, GOTOOLCHAIN=local) accepts upstream's go 1.27.0
+- Exclude the amazonlinux-2023 chroot, which ships Go 1.25 and cannot satisfy
+  the Go 1.26 requirement of dependencies such as go.mau.fi/whatsmeow
+
 * Sun Sep 06 2026 Codex Automation <noreply@users.noreply.github.com> - 0.17.2-1
 - Update to v0.17.2
 
