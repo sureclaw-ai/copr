@@ -7,6 +7,10 @@ Summary:        Open source AI coding agent for the terminal
 
 License:        MIT
 URL:            https://github.com/anomalyco/opencode
+# Source0/Source1 are the upstream per-arch npm binary packages
+# (@opencode/cli-linux-x64-baseline and @opencode/cli-linux-arm64), which since
+# v2.0.0 replace the tarballs previously attached to the GitHub release. They
+# unpack to package/bin/opencode. Source2 carries the docs from the git tag.
 Source0:        %{name}-%{version}-x86_64.tar.gz
 Source1:        %{name}-%{version}-aarch64.tar.gz
 Source2:        %{name}-%{version}-docs.tar.gz
@@ -27,7 +31,7 @@ tar -xzf %{SOURCE1}
 %endif
 
 %install
-install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
+install -Dpm0755 package/bin/opencode %{buildroot}%{_bindir}/opencode
 
 %check
 %{buildroot}%{_bindir}/opencode --version >/dev/null
