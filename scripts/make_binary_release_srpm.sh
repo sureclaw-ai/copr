@@ -14,6 +14,7 @@ upstream_url="${UPSTREAM_URL:-}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 release_asset_x86_64="${RELEASE_ASSET_X86_64:-}"
 release_asset_aarch64="${RELEASE_ASSET_AARCH64:-}"
+release_base_url_template="${RELEASE_BASE_URL:-}"
 doc_files="${DOC_FILES:-LICENSE README.md}"
 
 while [ "$#" -gt 0 ]; do
@@ -77,6 +78,17 @@ repo_path="${upstream_url#https://github.com/}"
 repo_path="${repo_path%.git}"
 mkdir -p "$sources_dir" "$docsdir"
 
+# Resolve an optional custom download base URL. Some upstreams (e.g. opencode
+# from v2.x onward) no longer attach release binaries to GitHub Releases and
+# instead host them elsewhere. RELEASE_BASE_URL overrides the GitHub Releases
+# location; it may contain {version} and {tag} placeholders that are expanded
+# here. When unset, downloads fall back to GitHub Releases as before.
+release_base_url=""
+if [ -n "$release_base_url_template" ]; then
+  release_base_url="$release_base_url_template"
+  release_base_url="$(printf '%s' "$release_base_url" | sed -e "s|{version}|${version}|g" -e "s|{tag}|${tag}|g")"
+fi
+
 curl_download() {
   url="$1"
   output_path="$2"
@@ -104,7 +116,11 @@ download_release_asset() {
   asset_name="$1"
   output_name="$2"
   output_path="${sources_dir}/${output_name}"
-  direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  if [ -n "$release_base_url" ]; then
+    direct_url="${release_base_url}${asset_name}"
+  else
+    direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  fi
   curl_download "${direct_url}" "${output_path}"
 }
 

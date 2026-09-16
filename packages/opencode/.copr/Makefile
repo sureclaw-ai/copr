@@ -8,5 +8,6 @@ srpm:
 	PACKAGE_NAME="opencode" \
 	RELEASE_ASSET_X86_64="opencode-linux-x64-baseline.tar.gz" \
 	RELEASE_ASSET_AARCH64="opencode-linux-arm64.tar.gz" \
+	RELEASE_BASE_URL="https://opencode.ai/files/bin/{version}/" \
 	DOC_FILES="LICENSE README.md" \
 	../../scripts/make_binary_release_srpm.sh --spec "$(spec)" --outdir "$(outdir)"
