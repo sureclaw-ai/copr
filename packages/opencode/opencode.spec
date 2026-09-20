@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           opencode
-Version:        2.0.10
+Version:        1.18.31
 Release:        1%{?dist}
 Summary:        Open source AI coding agent for the terminal
 
@@ -38,26 +38,9 @@ install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
 %{_bindir}/opencode
 
 %changelog
-* Sun Sep 20 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.10-1
-- Update to v2.0.10
-
-* Sat Sep 19 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.8-1
-- Update to v2.0.8
-
-* Fri Sep 18 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.7-1
-- Update to v2.0.7
-
-* Thu Sep 17 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.5-1
-- Update to v2.0.5
-
-* Wed Sep 16 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.4-1
-- Update to v2.0.4
-
-* Sun Sep 13 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.3-1
-- Update to v2.0.3
-
-* Sat Sep 12 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.0-1
-- Update to v2.0.0
+* Sun Sep 20 2026 Codex Automation <noreply@users.noreply.github.com> - 1.18.31-1
+- Track published GitHub releases instead of raw git tags
+- Revert to v1.18.31: the v2.0.x tags are unreleased and ship no binary assets
 
 * Wed Sep 09 2026 Codex Automation <noreply@users.noreply.github.com> - 1.18.30-1
 - Update to v1.18.30
