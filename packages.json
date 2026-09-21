@@ -52,6 +52,7 @@
       "subdir": "packages/opencode",
       "spec": "opencode.spec",
       "upstream_url": "https://github.com/anomalyco/opencode.git",
+      "npm_package": "opencode-ai",
       "tag_prefix": "v"
     },
     {
