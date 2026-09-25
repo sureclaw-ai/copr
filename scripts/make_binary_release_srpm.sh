@@ -15,6 +15,11 @@ upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 release_asset_x86_64="${RELEASE_ASSET_X86_64:-}"
 release_asset_aarch64="${RELEASE_ASSET_AARCH64:-}"
 doc_files="${DOC_FILES:-LICENSE README.md}"
+# Optional override for where prebuilt assets are fetched from. When unset the
+# assets are pulled from the upstream GitHub release. Set it for projects that
+# publish their binaries elsewhere (e.g. a CDN). Supported placeholders:
+#   %VERSION% -> spec version, %TAG% -> tag_prefix+version, %ASSET% -> asset name
+release_url_template="${RELEASE_URL_TEMPLATE:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -104,7 +109,14 @@ download_release_asset() {
   asset_name="$1"
   output_name="$2"
   output_path="${sources_dir}/${output_name}"
-  direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  if [ -n "$release_url_template" ]; then
+    direct_url="$(printf '%s' "$release_url_template" \
+      | sed -e "s|%ASSET%|${asset_name}|g" \
+            -e "s|%VERSION%|${version}|g" \
+            -e "s|%TAG%|${tag}|g")"
+  else
+    direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  fi
   curl_download "${direct_url}" "${output_path}"
 }
 
