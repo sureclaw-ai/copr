@@ -1,7 +1,13 @@
 %global debug_package %{nil}
 
+# opencode ships a Bun-compiled single-file executable with its JS bundle
+# appended after the ELF image; rpmbuild's default strip rewrites the binary
+# and corrupts that payload (the binary then reports a stale embedded version),
+# so stripping must be disabled to keep the packaged binary intact.
+%global __strip /bin/true
+
 Name:           opencode
-Version:        2.0.18
+Version:        1.18.33
 Release:        1%{?dist}
 Summary:        Open source AI coding agent for the terminal
 
@@ -38,6 +44,9 @@ install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
 %{_bindir}/opencode
 
 %changelog
+* Mon Sep 28 2026 Codex Automation <noreply@users.noreply.github.com> - 1.18.33-1
+- Update to v1.18.33
+
 * Sat Sep 26 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.18-1
 - Update to v2.0.18
 
