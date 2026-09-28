@@ -4,3 +4,6 @@
 .venv/
 __pycache__/
 **/.DS_Store
+
+# Claude Code session worktree scaffolding (transient)
+.claude/worktrees/
