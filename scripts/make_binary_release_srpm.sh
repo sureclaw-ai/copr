@@ -14,6 +14,15 @@ upstream_url="${UPSTREAM_URL:-}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 release_asset_x86_64="${RELEASE_ASSET_X86_64:-}"
 release_asset_aarch64="${RELEASE_ASSET_AARCH64:-}"
+# Optional, opt-in download URL overrides. When set, the asset is fetched from
+# this URL instead of the default GitHub release-download URL. This lets a
+# package pull its binaries from somewhere other than GitHub releases (e.g. the
+# npm registry) while leaving RELEASE_ASSET_* only responsible for naming the
+# resulting Source file. The tokens {version} and {tag} are substituted.
+# When unset (the default), behaviour is unchanged and the GitHub release URL is
+# used, so existing packages keep working untouched.
+download_url_x86_64="${DOWNLOAD_URL_X86_64:-}"
+download_url_aarch64="${DOWNLOAD_URL_AARCH64:-}"
 doc_files="${DOC_FILES:-LICENSE README.md}"
 
 while [ "$#" -gt 0 ]; do
@@ -100,16 +109,26 @@ curl_download() {
   done
 }
 
+substitute_tokens() {
+  # Replace {version} and {tag} tokens in the given string.
+  printf '%s' "$1" | sed -e "s|{version}|${version}|g" -e "s|{tag}|${tag}|g"
+}
+
 download_release_asset() {
   asset_name="$1"
   output_name="$2"
+  url_override="$3"
   output_path="${sources_dir}/${output_name}"
-  direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
-  curl_download "${direct_url}" "${output_path}"
+  if [ -n "$url_override" ]; then
+    url="$(substitute_tokens "$url_override")"
+  else
+    url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  fi
+  curl_download "${url}" "${output_path}"
 }
 
-download_release_asset "${release_asset_x86_64}" "${release_source_x86_64}"
-download_release_asset "${release_asset_aarch64}" "${release_source_aarch64}"
+download_release_asset "${release_asset_x86_64}" "${release_source_x86_64}" "${download_url_x86_64}"
+download_release_asset "${release_asset_aarch64}" "${release_source_aarch64}" "${download_url_aarch64}"
 
 git clone --depth 1 --branch "${tag}" "${upstream_url}" "${srcdir}"
 for doc_file in ${doc_files}; do
