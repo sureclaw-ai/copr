@@ -1,15 +1,22 @@
 %global debug_package %{nil}
 
+# The native `opencode` binary is a Bun single-file executable: its application
+# payload is appended after the ELF image. RPM's default post-install
+# processing strips the ELF, which drops that trailer and degrades the binary
+# into the bare Bun runtime (so `opencode` just launches Bun). Disable all
+# automatic binary post-processing to ship the upstream artifact byte-for-byte.
+%global __os_install_post %{nil}
+
 Name:           opencode
-Version:        2.0.24
+Version:        1.18.35
 Release:        1%{?dist}
 Summary:        Open source AI coding agent for the terminal
 
 License:        MIT
 URL:            https://github.com/anomalyco/opencode
-Source0:        %{name}-%{version}-x86_64.tar.gz
-Source1:        %{name}-%{version}-aarch64.tar.gz
-Source2:        %{name}-%{version}-docs.tar.gz
+Source0:        %{name}-%{version}.tgz
+Source1:        %{name}-%{version}-linux-x64
+Source2:        %{name}-%{version}-linux-arm64
 
 ExclusiveArch:  aarch64 x86_64
 
@@ -17,27 +24,32 @@ ExclusiveArch:  aarch64 x86_64
 OpenCode is an open source AI coding agent for the terminal.
 
 %prep
-%setup -q -T -c -n %{name}-%{version}
-tar -xzf %{SOURCE2}
-%ifarch x86_64
-tar -xzf %{SOURCE0}
-%endif
-%ifarch aarch64
-tar -xzf %{SOURCE1}
-%endif
+%setup -q -n package
+
+%build
+# Nothing to build; the npm release ships the native CLI binary.
 
 %install
-install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
+%ifarch x86_64
+install -Dpm0755 %{SOURCE1} %{buildroot}%{_bindir}/opencode
+%endif
+%ifarch aarch64
+install -Dpm0755 %{SOURCE2} %{buildroot}%{_bindir}/opencode
+%endif
 
 %check
 %{buildroot}%{_bindir}/opencode --version >/dev/null
 
 %files
 %license LICENSE
-%doc README.md
 %{_bindir}/opencode
 
 %changelog
+* Tue Oct 06 2026 Codex Automation <noreply@users.noreply.github.com> - 1.18.35-1
+- Switch to npm-based packaging (opencode-ai): repackage the per-platform Bun
+  binaries from the npm optionalDependency packages and track the npm `latest`
+  dist-tag (stable 1.18.35) instead of git tags (the v2.x preview line)
+
 * Tue Oct 06 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.24-1
 - Update to v2.0.24
 
