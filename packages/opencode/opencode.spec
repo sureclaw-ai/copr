@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:           opencode
-Version:        2.0.26
+Version:        1.19.0
 Release:        1%{?dist}
 Summary:        Open source AI coding agent for the terminal
 
@@ -38,6 +38,11 @@ install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
 %{_bindir}/opencode
 
 %changelog
+* Sun Oct 11 2026 Codex Automation <noreply@users.noreply.github.com> - 1.19.0-1
+- Track the upstream 1.x stable line; the v2.0.x tags are a preview line
+  that does not publish Linux release tarballs, so Copr builds 404 on
+  source download
+
 * Fri Oct 09 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.26-1
 - Update to v2.0.26
 
