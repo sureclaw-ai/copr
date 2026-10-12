@@ -14,7 +14,8 @@
     "almalinux-kitten-10",
     "alma-kitten+epel-10",
     "openeuler",
-    "opensuse-tumbleweed"
+    "opensuse-tumbleweed",
+    "opensuse-leap-16.0"
   ],
   "packages": [
     {
