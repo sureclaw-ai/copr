@@ -13,6 +13,7 @@ package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/openclaw/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 go_version_compat="${GO_VERSION_COMPAT:-}"
+go_drop_tool_directives="${GO_DROP_TOOL_DIRECTIVES:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -68,6 +69,23 @@ if [ -n "$go_version_compat" ]; then
     echo "GO_VERSION_COMPAT was set but ${srcdir}/go.mod does not exist" >&2
     exit 1
   fi
+  if [ -n "$go_drop_tool_directives" ]; then
+    # Drop Go 'tool' directives (both single-line and block form) and any
+    # 'toolchain' line. Tool directives reference dev-time helpers such as the
+    # sqlc code generator; they are never needed to build the packaged binary,
+    # but their own modules can require a newer Go toolchain than older build
+    # chroots ship, which pins the whole module above GO_VERSION_COMPAT and
+    # breaks the build. Removing them lets the go directive be lowered cleanly.
+    awk '
+      $1 == "toolchain" { next }
+      $1 == "tool" && $2 == "(" { in_tool_block = 1; next }
+      in_tool_block && $1 == ")" { in_tool_block = 0; next }
+      in_tool_block { next }
+      $1 == "tool" { next }
+      { print }
+    ' "${srcdir}/go.mod" >"${srcdir}/go.mod.tmp"
+    mv "${srcdir}/go.mod.tmp" "${srcdir}/go.mod"
+  fi
   go_mod_tmp="${srcdir}/go.mod.tmp"
   awk -v compat="$go_version_compat" '
     /^go [0-9]+\.[0-9]+(\.[0-9]+)?$/ && !updated {
@@ -94,6 +112,15 @@ rm -rf "${srcdir}/.git"
   export GOFLAGS="-mod=mod"
   export GOWORK=off
   go mod tidy
+  if [ -n "$go_version_compat" ]; then
+    # Pruning orphaned tool-only dependencies during the first 'go mod tidy' can
+    # transiently raise the go directive (an orphan may require a newer Go than
+    # GO_VERSION_COMPAT before it is removed). Re-assert the compatibility
+    # version and tidy again so the directive converges back down now that the
+    # orphans are gone.
+    go mod edit -go="$go_version_compat"
+    go mod tidy
+  fi
 )
 
 tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
