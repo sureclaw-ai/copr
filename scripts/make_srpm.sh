@@ -13,6 +13,7 @@ package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/openclaw/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 go_version_compat="${GO_VERSION_COMPAT:-}"
+go_drop_tools="${GO_DROP_TOOLS:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -62,6 +63,39 @@ mkdir -p "$sources_dir"
 git clone --depth 1 --branch "$tag" "$upstream_url" "$srcdir"
 commit="$(git -C "$srcdir" rev-parse --short=12 HEAD)"
 date="$(TZ=UTC git -C "$srcdir" log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd HEAD)"
+
+if [ -n "$go_drop_tools" ]; then
+  if [ ! -f "${srcdir}/go.mod" ]; then
+    echo "GO_DROP_TOOLS was set but ${srcdir}/go.mod does not exist" >&2
+    exit 1
+  fi
+  # Remove build-time-only Go tool dependencies (go >= 1.24 `tool` directives).
+  # Such tools are only used for code generation and are never needed to build
+  # the packaged binary, but they pull the tool's own module graph -- including
+  # its (often newer) `go` directive -- into the build. That can require a newer
+  # Go toolchain than the SRPM builder or the target chroots provide and break
+  # the build for everyone. Both the `tool` directive and the module's
+  # `require` line are dropped so `go mod tidy` never needs to load the tool's
+  # go.mod (which is what would fail on an older toolchain). Editing is done
+  # with `go mod edit`, which only rewrites go.mod and performs no version
+  # checks of its own.
+  for mod in $go_drop_tools; do
+    tools="$(awk '
+      /^tool[ \t]*\(/ { inblock = 1; next }
+      inblock && /^[ \t]*\)/ { inblock = 0; next }
+      inblock { print $1; next }
+      /^tool[ \t]+[^ \t(]/ { print $2 }
+    ' "${srcdir}/go.mod")"
+    for tool in $tools; do
+      case "$tool" in
+        "$mod" | "$mod"/*)
+          (cd "$srcdir" && go mod edit -droptool="$tool")
+          ;;
+      esac
+    done
+    (cd "$srcdir" && go mod edit -droprequire="$mod") 2>/dev/null || true
+  done
+fi
 
 if [ -n "$go_version_compat" ]; then
   if [ ! -f "${srcdir}/go.mod" ]; then
