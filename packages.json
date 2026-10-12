@@ -33,7 +33,8 @@
       "subdir": "packages/wacli",
       "spec": "wacli.spec",
       "upstream_url": "https://github.com/openclaw/wacli.git",
-      "tag_prefix": "v"
+      "tag_prefix": "v",
+      "exclude_distros": ["amazonlinux-2023", "fedora-43"]
     },
     {
       "chroot_arches": ["aarch64", "x86_64"],
