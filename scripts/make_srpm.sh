@@ -69,7 +69,16 @@ if [ -n "$go_version_compat" ]; then
     exit 1
   fi
   go_mod_tmp="${srcdir}/go.mod.tmp"
+  # Lower the go directive to the compat version and drop any `tool` directives.
+  # Tool dependencies (e.g. code generators) are only needed to regenerate
+  # sources that upstream has already committed; they are never compiled into
+  # the built binary. Keeping them can transitively pin the module to a newer
+  # Go toolchain than some target chroots ship, which breaks the build there.
   awk -v compat="$go_version_compat" '
+    /^tool \(/ { intool = 1; next }
+    intool && /^\)/ { intool = 0; next }
+    intool { next }
+    /^tool[ \t]/ { next }
     /^go [0-9]+\.[0-9]+(\.[0-9]+)?$/ && !updated {
       print "go " compat
       updated = 1
@@ -95,6 +104,22 @@ rm -rf "${srcdir}/.git"
   export GOWORK=off
   go mod tidy
 )
+
+if [ -n "$go_version_compat" ]; then
+  # `go mod tidy` above may raise the go directive back up to satisfy a
+  # now-removed tool dependency that it loads before pruning. Reset the
+  # directive to the compat version and tidy again; with the tool modules
+  # already gone, nothing forces it back up and it settles at the minimum the
+  # actual build requires. If a genuinely-imported dependency needs a newer Go,
+  # the directive stays raised and the failure surfaces honestly at build time.
+  (
+    cd "$srcdir"
+    export GOFLAGS="-mod=mod"
+    export GOWORK=off
+    go mod edit -go="$go_version_compat"
+    go mod tidy
+  )
+fi
 
 tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
 
