@@ -27,7 +27,10 @@ tar -xzf %{SOURCE1}
 %endif
 
 %install
-install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
+# Upstream publishes the Linux binaries as npm package tarballs
+# (@opencode/cli-<target>), whose archive root is a "package/" directory with
+# the executable at package/bin/opencode.
+install -Dpm0755 package/bin/opencode %{buildroot}%{_bindir}/opencode
 
 %check
 %{buildroot}%{_bindir}/opencode --version >/dev/null
