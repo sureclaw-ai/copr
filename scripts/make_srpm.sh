@@ -13,6 +13,8 @@ package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/openclaw/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 go_version_compat="${GO_VERSION_COMPAT:-}"
+go_drop_tools="${GO_DROP_TOOLS:-}"
+go_drop_requires="${GO_DROP_REQUIRES:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -83,6 +85,30 @@ if [ -n "$go_version_compat" ]; then
     exit 1
   }
   mv "$go_mod_tmp" "${srcdir}/go.mod"
+fi
+
+# Drop build-time-only `tool` directives (and their now-unused module
+# requirements) before tidy/vendor. Such tools (e.g. code generators whose
+# output is already committed upstream) are never imported by the build, but
+# `go mod tidy` still pulls them into the module graph and raises the main
+# module's `go` directive to satisfy their own requirements — which can push it
+# above the toolchain available in the build chroots. Dropping both the tool
+# directive and the module `require` before a single tidy keeps the resulting
+# go.mod consistent (so `go mod vendor` accepts it) with a minimal `go`
+# directive. `GO_DROP_REQUIRES` lists the module paths backing the dropped
+# tools; the tool directive alone is not enough because tidy would re-add the
+# require from the still-present directive.
+if [ -n "$go_drop_tools" ] || [ -n "$go_drop_requires" ]; then
+  if [ ! -f "${srcdir}/go.mod" ]; then
+    echo "GO_DROP_TOOLS/GO_DROP_REQUIRES was set but ${srcdir}/go.mod does not exist" >&2
+    exit 1
+  fi
+  for tool in $go_drop_tools; do
+    go mod edit -droptool="$tool" "${srcdir}/go.mod"
+  done
+  for req in $go_drop_requires; do
+    go mod edit -droprequire="$req" "${srcdir}/go.mod"
+  done
 fi
 
 printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
