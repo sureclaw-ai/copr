@@ -13,6 +13,7 @@ package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/openclaw/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 go_version_compat="${GO_VERSION_COMPAT:-}"
+go_drop_tools="${GO_DROP_TOOLS:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -63,6 +64,23 @@ git clone --depth 1 --branch "$tag" "$upstream_url" "$srcdir"
 commit="$(git -C "$srcdir" rev-parse --short=12 HEAD)"
 date="$(TZ=UTC git -C "$srcdir" log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd HEAD)"
 
+# Drop dev-only Go tool dependencies (e.g. codegen tools declared via a
+# `tool` directive in go.mod). They are never compiled to build the released
+# binary, but `go mod tidy` pulls their module graph in and, because such a
+# tool can require a newer Go than the target distributions ship, raises the
+# module's `go` directive above what the build chroots provide. Dropping them
+# keeps the vendored tree buildable on older toolchains and much smaller.
+if [ -n "$go_drop_tools" ]; then
+  for tool in $go_drop_tools; do
+    (
+      cd "$srcdir"
+      export GOFLAGS="-mod=mod"
+      export GOWORK=off
+      go mod edit -droptool="$tool"
+    )
+  done
+fi
+
 if [ -n "$go_version_compat" ]; then
   if [ ! -f "${srcdir}/go.mod" ]; then
     echo "GO_VERSION_COMPAT was set but ${srcdir}/go.mod does not exist" >&2
@@ -96,14 +114,32 @@ rm -rf "${srcdir}/.git"
   go mod tidy
 )
 
-tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
-
 (
   cd "$srcdir"
   export GOFLAGS="-mod=mod"
   export GOWORK=off
   go mod vendor
 )
+
+# `go mod tidy` may raise the `go` directive above $go_version_compat based on
+# the dependency graph, clobbering the pre-tidy rewrite above. Re-apply the
+# compat version now that vendoring is done, so the go.mod shipped in the
+# source tarball builds on toolchains as old as $go_version_compat. The
+# already-vendored tree stays consistent for `go build -mod=vendor`.
+if [ -n "$go_version_compat" ]; then
+  (
+    cd "$srcdir"
+    export GOFLAGS="-mod=mod"
+    export GOWORK=off
+    go mod edit -go="$go_version_compat"
+  )
+fi
+
+# Exclude the freshly vendored tree from the source tarball; it ships
+# separately as the vendor tarball below.
+tar -C "$workdir" \
+  --exclude="${package_name}-${version}/vendor" \
+  -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
 
 tar -C "$srcdir" -czf "${sources_dir}/${package_name}-${version}-vendor.tar.gz" vendor
 
