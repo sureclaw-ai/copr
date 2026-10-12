@@ -7,4 +7,7 @@ srpm:
 	UPSTREAM_URL="https://github.com/openclaw/wacli.git" \
 	UPSTREAM_TAG_PREFIX="v" \
 	PACKAGE_NAME="wacli" \
+	GO_VERSION_COMPAT="1.25" \
+	GO_DROP_TOOLS="github.com/sqlc-dev/sqlc/cmd/sqlc" \
+	GO_DROP_REQUIRES="github.com/sqlc-dev/sqlc github.com/sqlc-dev/doubleclick" \
 	../../scripts/make_srpm.sh --spec "$(spec)" --outdir "$(outdir)"
