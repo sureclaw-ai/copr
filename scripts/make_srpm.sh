@@ -13,6 +13,7 @@ package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/openclaw/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 go_version_compat="${GO_VERSION_COMPAT:-}"
+go_drop_tools="${GO_DROP_TOOLS:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -89,6 +90,20 @@ printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
 printf '%s\n' "$date" >"${srcdir}/.copr-date"
 rm -rf "${srcdir}/.git"
 
+# Drop build-time "tool" directives (Go 1.24+) that we never compile when
+# packaging (e.g. code generators). Left in place, `go mod tidy` raises the
+# module's go directive to satisfy the tool's own floor, which can exceed the
+# Go toolchain shipped by some builder chroots.
+if [ -n "$go_drop_tools" ]; then
+  if [ ! -f "${srcdir}/go.mod" ]; then
+    echo "GO_DROP_TOOLS was set but ${srcdir}/go.mod does not exist" >&2
+    exit 1
+  fi
+  for tool_path in $go_drop_tools; do
+    (cd "$srcdir" && go mod edit -droptool="$tool_path")
+  done
+fi
+
 (
   cd "$srcdir"
   export GOFLAGS="-mod=mod"
@@ -96,14 +111,27 @@ rm -rf "${srcdir}/.git"
   go mod tidy
 )
 
-tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
-
 (
   cd "$srcdir"
   export GOFLAGS="-mod=mod"
   export GOWORK=off
   go mod vendor
 )
+
+# `go mod tidy`/`vendor` may raise the go directive to a dependency's declared
+# floor even though the packages we actually compile build with an older Go.
+# Re-pin the directive to the compat version *after* vendoring (vendoring needs
+# the higher floor to stay consistent) so builder chroots on that older Go
+# (e.g. fedora-43, amazonlinux-2023 on Go 1.25) accept the vendored source.
+if [ -n "$go_version_compat" ]; then
+  (cd "$srcdir" && go mod edit -go="$go_version_compat")
+fi
+
+# Exclude the freshly created vendor tree from the source tarball; it ships
+# separately as Source1.
+tar -C "$workdir" \
+  --exclude="${package_name}-${version}/vendor" \
+  -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
 
 tar -C "$srcdir" -czf "${sources_dir}/${package_name}-${version}-vendor.tar.gz" vendor
 
