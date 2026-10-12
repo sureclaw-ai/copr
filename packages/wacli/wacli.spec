@@ -22,6 +22,16 @@ messages from the terminal.
 %prep
 %autosetup -n %{name}-%{version} -a1
 
+# Upstream's go.mod declares "go 1.26.5" and pulls sqlc (a code-generation
+# tool referenced via a `tool` directive, not linked into the wacli binary)
+# which in turn requires Go >= 1.26.0. On chroots that still ship Go 1.25
+# (e.g. Fedora 43, Amazon Linux 2023) GOTOOLCHAIN=local then refuses to build
+# even though wacli itself compiles cleanly on 1.25. Relax the module's Go
+# requirement and the vendored dependency annotations so the local toolchain
+# is accepted; newer toolchains build identically.
+go mod edit -go=1.25 -toolchain=none
+sed -i -E 's/^(## (explicit; )?go )1\.(2[6-9]|[3-9][0-9]?)(\.[0-9]+)?$/\11.25/' vendor/modules.txt
+
 %build
 export CGO_ENABLED=1
 export CGO_CFLAGS="${CGO_CFLAGS:+${CGO_CFLAGS} }-Wno-error=missing-braces"
