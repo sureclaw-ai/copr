@@ -13,6 +13,7 @@ package_name="${PACKAGE_NAME:-gogcli}"
 upstream_url="${UPSTREAM_URL:-https://github.com/openclaw/gogcli.git}"
 upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 go_version_compat="${GO_VERSION_COMPAT:-}"
+go_drop_tool_directives="${GO_DROP_TOOL_DIRECTIVES:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -63,25 +64,28 @@ git clone --depth 1 --branch "$tag" "$upstream_url" "$srcdir"
 commit="$(git -C "$srcdir" rev-parse --short=12 HEAD)"
 date="$(TZ=UTC git -C "$srcdir" log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd HEAD)"
 
-if [ -n "$go_version_compat" ]; then
+if [ -n "$go_version_compat" ] || [ "$go_drop_tool_directives" = "1" ]; then
   if [ ! -f "${srcdir}/go.mod" ]; then
-    echo "GO_VERSION_COMPAT was set but ${srcdir}/go.mod does not exist" >&2
+    echo "GO_VERSION_COMPAT/GO_DROP_TOOL_DIRECTIVES set but ${srcdir}/go.mod does not exist" >&2
     exit 1
   fi
+fi
+
+# Drop build-time `tool` directives before touching the module graph. These name
+# code-generation tools (e.g. sqlc) whose output is already committed upstream
+# and which are never compiled into the packaged binary. Left in place, their
+# own module requirements can pin `go mod tidy` to a newer Go than the oldest
+# target chroots ship, defeating GO_VERSION_COMPAT below. Handles both the
+# single-line (`tool <path>`) and block (`tool ( ... )`) forms.
+if [ "$go_drop_tool_directives" = "1" ]; then
   go_mod_tmp="${srcdir}/go.mod.tmp"
-  awk -v compat="$go_version_compat" '
-    /^go [0-9]+\.[0-9]+(\.[0-9]+)?$/ && !updated {
-      print "go " compat
-      updated = 1
-      next
-    }
+  awk '
+    $1 == "tool" && $2 == "(" { in_block = 1; next }
+    in_block && $1 == ")" { in_block = 0; next }
+    in_block { next }
+    $1 == "tool" { next }
     { print }
-    END { if (!updated) exit 2 }
-  ' "${srcdir}/go.mod" >"$go_mod_tmp" || {
-    rm -f "$go_mod_tmp"
-    echo "Unable to update go directive in ${srcdir}/go.mod" >&2
-    exit 1
-  }
+  ' "${srcdir}/go.mod" >"$go_mod_tmp"
   mv "$go_mod_tmp" "${srcdir}/go.mod"
 fi
 
@@ -93,7 +97,21 @@ rm -rf "${srcdir}/.git"
   cd "$srcdir"
   export GOFLAGS="-mod=mod"
   export GOWORK=off
+  # First tidy resolves and prunes the module graph (fetching a newer toolchain
+  # if the upstream `go` directive demands it, and dropping deps left unused
+  # once tool directives were removed).
   go mod tidy
+  if [ -n "$go_version_compat" ]; then
+    # Lower the `go` directive to the compat baseline and remove any `toolchain`
+    # line, then re-tidy so the graph is self-consistent at that version. This
+    # must happen AFTER the first tidy: applying it earlier lets tidy ratchet the
+    # directive back up to whatever the upstream (or a now-removed tool dep)
+    # required. With the offending deps already pruned, the reconcile keeps the
+    # directive at the baseline so the offline chroot build (GOTOOLCHAIN=local)
+    # accepts it.
+    go mod edit -go="$go_version_compat" -toolchain=none
+    go mod tidy
+  fi
 )
 
 tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
