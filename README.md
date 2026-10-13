@@ -40,6 +40,7 @@ Each package lives in its own subdirectory under `packages/` and is built in its
 - `scripts/make_binary_release_srpm.sh`: downloads release artifacts and emits an SRPM
 - `scripts/make_node_binary_srpm.sh`: downloads both official Node.js Linux architectures, verifies them against the upstream SHA-256 manifest, and emits an SRPM
 - `scripts/make_npm_srpm.sh`: downloads an npm package tarball and emits an SRPM
+- `scripts/make_npm_binary_srpm.sh`: downloads a project's per-architecture native CLI binaries from their platform-specific npm packages and emits an SRPM
 - `scripts/make_python_srpm.sh`: clones an upstream Python project tag and emits an SRPM
 - `scripts/ensure_copr.py`: creates or updates the COPR project and package source definition
 - `.github/workflows/update-copr.yml`: daily upstream check, rebuild on pushes to `main`, plus optional manual rebuild

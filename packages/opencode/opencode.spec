@@ -1,14 +1,20 @@
 %global debug_package %{nil}
 
+# The `opencode` binary is a Bun single-file executable: its application payload
+# is appended after the ELF image. RPM's default post-install processing strips
+# the ELF, which drops that trailer and breaks the binary. Disable all automatic
+# binary post-processing to ship the upstream artifact byte-for-byte.
+%global __os_install_post %{nil}
+
 Name:           opencode
 Version:        2.0.27
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Open source AI coding agent for the terminal
 
 License:        MIT
 URL:            https://github.com/anomalyco/opencode
-Source0:        %{name}-%{version}-x86_64.tar.gz
-Source1:        %{name}-%{version}-aarch64.tar.gz
+Source0:        %{name}-%{version}-linux-x64
+Source1:        %{name}-%{version}-linux-arm64
 Source2:        %{name}-%{version}-docs.tar.gz
 
 ExclusiveArch:  aarch64 x86_64
@@ -19,15 +25,17 @@ OpenCode is an open source AI coding agent for the terminal.
 %prep
 %setup -q -T -c -n %{name}-%{version}
 tar -xzf %{SOURCE2}
-%ifarch x86_64
-tar -xzf %{SOURCE0}
-%endif
-%ifarch aarch64
-tar -xzf %{SOURCE1}
-%endif
+
+%build
+# Nothing to build; upstream ships the native CLI binary via npm.
 
 %install
-install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
+%ifarch x86_64
+install -Dpm0755 %{SOURCE0} %{buildroot}%{_bindir}/opencode
+%endif
+%ifarch aarch64
+install -Dpm0755 %{SOURCE1} %{buildroot}%{_bindir}/opencode
+%endif
 
 %check
 %{buildroot}%{_bindir}/opencode --version >/dev/null
@@ -38,6 +46,9 @@ install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
 %{_bindir}/opencode
 
 %changelog
+* Tue Oct 13 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.27-2
+- Package the native Linux binaries from upstream's npm packages
+
 * Mon Oct 12 2026 Codex Automation <noreply@users.noreply.github.com> - 2.0.27-1
 - Update to v2.0.27
 
