@@ -77,6 +77,13 @@ repo_path="${upstream_url#https://github.com/}"
 repo_path="${repo_path%.git}"
 mkdir -p "$sources_dir" "$docsdir"
 
+# Base URL for downloading release assets. Defaults to GitHub release assets,
+# but can be overridden (e.g. for projects that host binaries elsewhere) via
+# RELEASE_DOWNLOAD_BASE. The literal tokens %VERSION% and %TAG% are expanded.
+release_download_base_default="https://github.com/${repo_path}/releases/download/${tag}"
+release_download_base="${RELEASE_DOWNLOAD_BASE:-$release_download_base_default}"
+release_download_base="$(printf '%s' "$release_download_base" | sed -e "s|%VERSION%|${version}|g" -e "s|%TAG%|${tag}|g")"
+
 curl_download() {
   url="$1"
   output_path="$2"
@@ -104,7 +111,7 @@ download_release_asset() {
   asset_name="$1"
   output_name="$2"
   output_path="${sources_dir}/${output_name}"
-  direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  direct_url="${release_download_base}/${asset_name}"
   curl_download "${direct_url}" "${output_path}"
 }
 

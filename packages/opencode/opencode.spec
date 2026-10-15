@@ -1,4 +1,11 @@
 %global debug_package %{nil}
+# The opencode binary is a Bun single-file executable: its application payload
+# is appended after the ELF image. RPM's default post-install processing would
+# strip the ELF and discard that trailer, leaving a binary that silently falls
+# back to the bare Bun runtime (e.g. `opencode --version` prints the Bun
+# version instead of opencode's). Disable automatic binary post-processing so
+# the upstream artifact ships byte-for-byte.
+%global __os_install_post %{nil}
 
 Name:           opencode
 Version:        2.0.29
