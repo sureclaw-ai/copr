@@ -2,7 +2,7 @@
 
 Name:           gogcli
 Version:        0.45.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Google Workspace CLI for the terminal
 
 License:        MIT
@@ -11,6 +11,19 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
 BuildRequires:  golang >= 1.25
+%if 0%{?suse_version}
+# gogcli's vendored go.mod pins a newer Go through its "go"/"toolchain"
+# directives (e.g. "go 1.26.0" / "toolchain go1.27.2"). On openSUSE/SLE the
+# generic "golang" dependency is satisfied only by the versioned Go
+# meta-package, which can resolve to a toolchain older than the module requires,
+# and Leap's Go is configured with GOTOOLCHAIN=local, which forbids fetching a
+# newer toolchain in-build. The build then fails with:
+#   go: go.mod requires go >= 1.26.0 (running go 1.25.x; GOTOOLCHAIN=local)
+# Pull in an explicit, sufficiently new Go toolchain so the build succeeds
+# offline. Its higher-priority update-alternatives entry makes /usr/bin/go
+# resolve to it even if an older Go is co-installed via the meta-package.
+BuildRequires:  go1.27
+%endif
 ExclusiveArch:  aarch64 x86_64
 
 %description
@@ -51,6 +64,11 @@ install -Dpm0755 gog %{buildroot}%{_bindir}/gog
 %{_bindir}/gog
 
 %changelog
+* Sat Oct 17 2026 matt haigh <matthaigh27@gmail.com> - 0.45.0-2
+- Pull in an explicit go1.27 toolchain on openSUSE/SLE, where Go defaults to
+  GOTOOLCHAIN=local and the generic golang dependency can resolve to a Go older
+  than go.mod requires, breaking the build on opensuse-leap-16.0
+
 * Fri Oct 16 2026 Codex Automation <noreply@users.noreply.github.com> - 0.45.0-1
 - Update to v0.45.0
 
