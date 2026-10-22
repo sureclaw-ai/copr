@@ -2,7 +2,7 @@
 
 Name:           wacli
 Version:        0.24.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        WhatsApp CLI for sync, search, and send
 
 License:        MIT
@@ -11,7 +11,12 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
 BuildRequires:  gcc
-BuildRequires:  golang >= 1.25
+# The vendored go.mod ships `go 1.26.0` (deps pin it; `go mod tidy` in
+# make_srpm.sh restores this even after GO_VERSION_COMPAT lowers the directive),
+# so the build root needs a Go toolchain >= 1.26. On openSUSE Leap 16.0 `golang`
+# is a versioned virtual Provide (go 1.25/1.26/1.27 all provide it), so a >= 1.25
+# floor can resolve to Go 1.25, which is too old to build the module offline.
+BuildRequires:  golang >= 1.26
 ExclusiveArch:  aarch64 x86_64
 
 %description
@@ -25,6 +30,14 @@ messages from the terminal.
 %build
 export CGO_ENABLED=1
 export CGO_CFLAGS="${CGO_CFLAGS:+${CGO_CFLAGS} }-Wno-error=missing-braces"
+# The vendored go.mod keeps a `toolchain go1.27.x` line (make_srpm.sh lowers only
+# the `go` directive, not the toolchain). With the default GOTOOLCHAIN=auto, a
+# build root whose Go is older than that toolchain tries to download the newer Go
+# toolchain over the network. COPR per-chroot builds have NO network, so that
+# fails (this is what breaks openSUSE Leap 16.0, which ships Go < 1.27 and leaves
+# GOTOOLCHAIN=auto). Force the installed toolchain; BuildRequires golang >= 1.26
+# guarantees it satisfies the go.mod `go 1.26.0` directive.
+export GOTOOLCHAIN=local
 export GOFLAGS="-mod=vendor -trimpath"
 export GOWORK=off
 go build \
@@ -45,6 +58,11 @@ install -Dpm0755 wacli %{buildroot}%{_bindir}/wacli
 %{_bindir}/wacli
 
 %changelog
+* Thu Oct 22 2026 matt haigh <matthaigh27@gmail.com> - 0.24.0-2
+- Force GOTOOLCHAIN=local so the network-less build never tries to download the
+  go.mod `toolchain go1.27.x` toolchain (prevents an opensuse-leap-16.0 failure)
+- Require golang >= 1.26 to match the vendored `go 1.26.0` directive
+
 * Thu Oct 22 2026 Codex Automation <noreply@users.noreply.github.com> - 0.24.0-1
 - Update to v0.24.0
 
