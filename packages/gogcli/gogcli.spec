@@ -2,7 +2,7 @@
 
 Name:           gogcli
 Version:        0.46.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Google Workspace CLI for the terminal
 
 License:        MIT
@@ -10,7 +10,13 @@ URL:            https://github.com/openclaw/gogcli
 Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
-BuildRequires:  golang >= 1.25
+# The vendored go.mod ships `go 1.26.0` (many cloud.google.com/go/* deps pin it;
+# `go mod tidy` in make_srpm.sh restores this even after GO_VERSION_COMPAT lowers
+# the directive), so the build needs a Go toolchain >= 1.26 present in the build
+# root. On openSUSE Leap 16.0 `golang` is a versioned virtual Provide (go 1.25,
+# 1.26, 1.27 all provide it), so a >= 1.25 floor can resolve to Go 1.25, which is
+# too old for the `go 1.26.0` directive and cannot build offline.
+BuildRequires:  golang >= 1.26
 ExclusiveArch:  aarch64 x86_64
 
 %description
@@ -27,6 +33,16 @@ export CGO_ENABLED=0
 # breaks our CGO_ENABLED=0 build, so opt out. Harmless on upstream Go (Fedora),
 # which ignores this Microsoft-specific variable.
 export MS_GO_NOSYSTEMCRYPTO=1
+# The vendored go.mod keeps a `toolchain go1.27.x` line (make_srpm.sh lowers only
+# the `go` directive, not the toolchain). With the default GOTOOLCHAIN=auto, a
+# build root whose Go is older than that toolchain tries to download the newer Go
+# toolchain over the network. COPR per-chroot builds have NO network, so that
+# fails. openSUSE Leap 16.0 ships Go < 1.27 while leaving GOTOOLCHAIN=auto, which
+# is why only the opensuse-leap chroots broke (Fedora/RHEL/Azure/etc. either ship
+# a Go that already satisfies the toolchain or pin GOTOOLCHAIN=local themselves).
+# Force the installed toolchain and never attempt a download; BuildRequires
+# golang >= 1.26 guarantees it satisfies the go.mod `go 1.26.0` directive.
+export GOTOOLCHAIN=local
 export GOFLAGS="-mod=vendor -trimpath"
 VERSION="v%{version}"
 COMMIT="$(tr -d '\n' < .copr-commit)"
@@ -51,6 +67,11 @@ install -Dpm0755 gog %{buildroot}%{_bindir}/gog
 %{_bindir}/gog
 
 %changelog
+* Thu Oct 22 2026 matt haigh <matthaigh27@gmail.com> - 0.46.0-2
+- Force GOTOOLCHAIN=local so the network-less build never tries to download the
+  go.mod `toolchain go1.27.x` toolchain (fixes opensuse-leap-16.0 build failure)
+- Require golang >= 1.26 to match the vendored `go 1.26.0` directive
+
 * Thu Oct 22 2026 Codex Automation <noreply@users.noreply.github.com> - 0.46.0-1
 - Update to v0.46.0
 
