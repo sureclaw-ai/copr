@@ -15,6 +15,7 @@ upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 release_asset_x86_64="${RELEASE_ASSET_X86_64:-}"
 release_asset_aarch64="${RELEASE_ASSET_AARCH64:-}"
 doc_files="${DOC_FILES:-LICENSE README.md}"
+release_url_template="${RELEASE_URL_TEMPLATE:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -104,8 +105,16 @@ download_release_asset() {
   asset_name="$1"
   output_name="$2"
   output_path="${sources_dir}/${output_name}"
-  direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
-  curl_download "${direct_url}" "${output_path}"
+  if [ -n "$release_url_template" ]; then
+    # Some upstreams publish their release binaries off GitHub (e.g. their own
+    # CDN) rather than as GitHub release assets. RELEASE_URL_TEMPLATE overrides
+    # the download URL and supports {version}, {tag} and {asset} placeholders.
+    download_url="$(printf '%s' "$release_url_template" \
+      | sed -e "s|{version}|${version}|g" -e "s|{tag}|${tag}|g" -e "s|{asset}|${asset_name}|g")"
+  else
+    download_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  fi
+  curl_download "${download_url}" "${output_path}"
 }
 
 download_release_asset "${release_asset_x86_64}" "${release_source_x86_64}"
