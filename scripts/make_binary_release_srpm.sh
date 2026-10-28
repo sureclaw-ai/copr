@@ -15,6 +15,14 @@ upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 release_asset_x86_64="${RELEASE_ASSET_X86_64:-}"
 release_asset_aarch64="${RELEASE_ASSET_AARCH64:-}"
 doc_files="${DOC_FILES:-LICENSE README.md}"
+# Optional override for where release assets are fetched from. When unset the
+# assets are downloaded from the upstream GitHub release
+# (https://github.com/<repo>/releases/download/<tag>/<asset>). When set, assets
+# are downloaded from "<base>/<asset>" instead; the tokens {version} and {tag}
+# in the base URL are expanded. This is needed for projects (e.g. opencode) that
+# no longer attach their prebuilt binaries to GitHub releases but host them on a
+# separate CDN.
+release_download_base_url="${RELEASE_DOWNLOAD_BASE_URL:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -104,7 +112,13 @@ download_release_asset() {
   asset_name="$1"
   output_name="$2"
   output_path="${sources_dir}/${output_name}"
-  direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  if [ -n "$release_download_base_url" ]; then
+    base_url="$(printf '%s' "$release_download_base_url" \
+      | sed -e "s|{version}|${version}|g" -e "s|{tag}|${tag}|g")"
+    direct_url="${base_url}/${asset_name}"
+  else
+    direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  fi
   curl_download "${direct_url}" "${output_path}"
 }
 
