@@ -63,26 +63,40 @@ git clone --depth 1 --branch "$tag" "$upstream_url" "$srcdir"
 commit="$(git -C "$srcdir" rev-parse --short=12 HEAD)"
 date="$(TZ=UTC git -C "$srcdir" log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd HEAD)"
 
-if [ -n "$go_version_compat" ]; then
-  if [ ! -f "${srcdir}/go.mod" ]; then
-    echo "GO_VERSION_COMPAT was set but ${srcdir}/go.mod does not exist" >&2
+# Pin the go.mod "go" directive down to $go_version_compat and drop any
+# "toolchain" line. COPR's per-chroot builds run under GOTOOLCHAIN=local, so Go
+# never downloads a newer toolchain and enforces only the "go" directive: if a
+# chroot's bundled Go is older than that directive, `go build` aborts before
+# compiling. Lowering the directive to a version every target chroot satisfies
+# keeps the build working even on distros whose Go lags (e.g. opensuse-leap).
+rewrite_go_mod_compat() {
+  go_mod_path="$1"
+  if [ ! -f "$go_mod_path" ]; then
+    echo "GO_VERSION_COMPAT was set but ${go_mod_path} does not exist" >&2
     exit 1
   fi
-  go_mod_tmp="${srcdir}/go.mod.tmp"
+  go_mod_tmp="${go_mod_path}.tmp"
   awk -v compat="$go_version_compat" '
     /^go [0-9]+\.[0-9]+(\.[0-9]+)?$/ && !updated {
       print "go " compat
       updated = 1
       next
     }
+    /^toolchain / { next }
     { print }
     END { if (!updated) exit 2 }
-  ' "${srcdir}/go.mod" >"$go_mod_tmp" || {
+  ' "$go_mod_path" >"$go_mod_tmp" || {
     rm -f "$go_mod_tmp"
-    echo "Unable to update go directive in ${srcdir}/go.mod" >&2
+    echo "Unable to update go directive in ${go_mod_path}" >&2
     exit 1
   }
-  mv "$go_mod_tmp" "${srcdir}/go.mod"
+  mv "$go_mod_tmp" "$go_mod_path"
+}
+
+# Apply once before `go mod tidy` so tidy can run even when upstream's directive
+# is newer than the builder's Go.
+if [ -n "$go_version_compat" ]; then
+  rewrite_go_mod_compat "${srcdir}/go.mod"
 fi
 
 printf '%s\n' "$commit" >"${srcdir}/.copr-commit"
@@ -96,14 +110,28 @@ rm -rf "${srcdir}/.git"
   go mod tidy
 )
 
-tar -C "$workdir" -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
-
 (
   cd "$srcdir"
   export GOFLAGS="-mod=mod"
   export GOWORK=off
   go mod vendor
 )
+
+# `go mod tidy`/`go mod vendor` re-raise the "go" directive to satisfy
+# dependencies (and may re-add a toolchain line), undoing the pre-tidy rewrite.
+# Re-apply it now, after vendoring is complete, so the lowered directive is what
+# actually ships. Done after `go mod vendor` (not before) because vendoring
+# rejects a go.mod whose directive is lower than the module graph requires; the
+# subsequent `go build -mod=vendor` in the spec consumes the vendored tree and
+# is happy with the lowered directive.
+if [ -n "$go_version_compat" ]; then
+  rewrite_go_mod_compat "${srcdir}/go.mod"
+fi
+
+# Source tarball excludes the vendored tree, which ships separately as the
+# vendor tarball and is unpacked over the sources at build time.
+tar -C "$workdir" --exclude="${package_name}-${version}/vendor" \
+  -czf "${sources_dir}/${package_name}-${version}.tar.gz" "${package_name}-${version}"
 
 tar -C "$srcdir" -czf "${sources_dir}/${package_name}-${version}-vendor.tar.gz" vendor
 
