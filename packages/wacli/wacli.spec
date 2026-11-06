@@ -2,7 +2,7 @@
 
 Name:           wacli
 Version:        0.26.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        WhatsApp CLI for sync, search, and send
 
 License:        MIT
@@ -11,7 +11,14 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
 BuildRequires:  gcc
+# openSUSE ships the Go toolchain as "go" (there is no "golang" package), so
+# "golang >= 1.25" is unsatisfiable there and the opensuse-leap chroots fail at
+# dependency resolution. Select the distro-appropriate name.
+%if 0%{?suse_version}
+BuildRequires:  go >= 1.25
+%else
 BuildRequires:  golang >= 1.25
+%endif
 ExclusiveArch:  aarch64 x86_64
 
 %description
@@ -45,6 +52,11 @@ install -Dpm0755 wacli %{buildroot}%{_bindir}/wacli
 %{_bindir}/wacli
 
 %changelog
+* Fri Nov 06 2026 matt haigh <matthaigh27@gmail.com> - 0.26.0-2
+- Fix opensuse-leap-16.0 build: openSUSE provides the Go compiler as "go", not
+  "golang", so "BuildRequires: golang >= 1.25" was unsatisfiable on those
+  chroots. Require "go >= 1.25" on SUSE and keep "golang >= 1.25" elsewhere.
+
 * Fri Nov 06 2026 Codex Automation <noreply@users.noreply.github.com> - 0.26.0-1
 - Update to v0.26.0
 

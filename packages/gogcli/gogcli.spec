@@ -2,7 +2,7 @@
 
 Name:           gogcli
 Version:        0.48.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Google Workspace CLI for the terminal
 
 License:        MIT
@@ -10,7 +10,14 @@ URL:            https://github.com/openclaw/gogcli
 Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
+# openSUSE ships the Go toolchain as "go" (there is no "golang" package), so
+# "golang >= 1.25" is unsatisfiable there and the opensuse-leap chroots fail at
+# dependency resolution. Select the distro-appropriate name.
+%if 0%{?suse_version}
+BuildRequires:  go >= 1.25
+%else
 BuildRequires:  golang >= 1.25
+%endif
 ExclusiveArch:  aarch64 x86_64
 
 %description
@@ -51,6 +58,12 @@ install -Dpm0755 gog %{buildroot}%{_bindir}/gog
 %{_bindir}/gog
 
 %changelog
+* Fri Nov 06 2026 matt haigh <matthaigh27@gmail.com> - 0.48.0-2
+- Fix opensuse-leap-16.0 build: openSUSE provides the Go compiler as "go", not
+  "golang", so "BuildRequires: golang >= 1.25" was unsatisfiable and those
+  chroots failed at dependency resolution. Require "go >= 1.25" on SUSE and keep
+  "golang >= 1.25" elsewhere.
+
 * Fri Nov 06 2026 Codex Automation <noreply@users.noreply.github.com> - 0.48.0-1
 - Update to v0.48.0
 
