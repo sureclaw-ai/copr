@@ -4,3 +4,6 @@
 .venv/
 __pycache__/
 **/.DS_Store
+
+# Transient git worktrees created by background agents
+.claude/worktrees/
