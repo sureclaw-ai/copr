@@ -11,7 +11,16 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
 BuildRequires:  gcc
+# openSUSE has no unversioned "golang" package; its "golang" capability is
+# provided only by the "go" meta-package at the distro default version, which
+# lags behind. The versioned Go compilers (go1.25, …) instead provide the "go"
+# capability, so require that on SUSE. Fedora/RHEL/EPEL "golang" satisfies both,
+# but keep "golang" there to avoid disturbing the chroots that already build.
+%if 0%{?suse_version}
+BuildRequires:  go >= 1.25
+%else
 BuildRequires:  golang >= 1.25
+%endif
 ExclusiveArch:  aarch64 x86_64
 
 %description
