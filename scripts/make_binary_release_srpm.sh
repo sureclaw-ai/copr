@@ -15,6 +15,16 @@ upstream_tag_prefix="${UPSTREAM_TAG_PREFIX:-v}"
 release_asset_x86_64="${RELEASE_ASSET_X86_64:-}"
 release_asset_aarch64="${RELEASE_ASSET_AARCH64:-}"
 doc_files="${DOC_FILES:-LICENSE README.md}"
+# Template for the per-asset download URL. The placeholders {repo_path}, {tag},
+# {version} and {asset} are substituted at download time. Defaults to the
+# upstream GitHub release assets; override for projects that publish their
+# release binaries elsewhere. (Assigned via if/else rather than ${VAR:-default}
+# because the default value itself contains braces, which break that syntax.)
+if [ -n "${RELEASE_URL_TEMPLATE:-}" ]; then
+  release_url_template="$RELEASE_URL_TEMPLATE"
+else
+  release_url_template='https://github.com/{repo_path}/releases/download/{tag}/{asset}'
+fi
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -104,7 +114,11 @@ download_release_asset() {
   asset_name="$1"
   output_name="$2"
   output_path="${sources_dir}/${output_name}"
-  direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  direct_url="$(printf '%s' "$release_url_template" \
+    | sed -e "s|{repo_path}|${repo_path}|g" \
+          -e "s|{tag}|${tag}|g" \
+          -e "s|{version}|${version}|g" \
+          -e "s|{asset}|${asset_name}|g")"
   curl_download "${direct_url}" "${output_path}"
 }
 
