@@ -75,6 +75,7 @@ if [ -n "$go_version_compat" ]; then
       updated = 1
       next
     }
+    /^toolchain / { next }
     { print }
     END { if (!updated) exit 2 }
   ' "${srcdir}/go.mod" >"$go_mod_tmp" || {
