@@ -10,7 +10,7 @@ URL:            https://github.com/openclaw/gogcli
 Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
-BuildRequires:  golang >= 1.25
+BuildRequires:  golang >= 1.26
 ExclusiveArch:  aarch64 x86_64
 
 %description
@@ -27,6 +27,12 @@ export CGO_ENABLED=0
 # breaks our CGO_ENABLED=0 build, so opt out. Harmless on upstream Go (Fedora),
 # which ignores this Microsoft-specific variable.
 export MS_GO_NOSYSTEMCRYPTO=1
+# Copr builds each chroot offline, so Go must never try to download a
+# toolchain. gogcli's go.mod carries a `toolchain` directive newer than some
+# chroots' system Go (e.g. opensuse-leap-16.0); with GOTOOLCHAIN=auto that
+# triggers a network fetch that fails in mock. Pin to the system toolchain;
+# BuildRequires: golang >= 1.26 guarantees it satisfies the go.mod go line.
+export GOTOOLCHAIN=local
 export GOFLAGS="-mod=vendor -trimpath"
 VERSION="v%{version}"
 COMMIT="$(tr -d '\n' < .copr-commit)"
