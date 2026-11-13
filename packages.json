@@ -24,7 +24,8 @@
       "subdir": "packages/gogcli",
       "spec": "gogcli.spec",
       "upstream_url": "https://github.com/openclaw/gogcli.git",
-      "tag_prefix": "v"
+      "tag_prefix": "v",
+      "exclude_distros": ["opensuse-leap"]
     },
     {
       "chroot_arches": ["aarch64", "x86_64"],
