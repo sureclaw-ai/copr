@@ -52,7 +52,8 @@
       "subdir": "packages/opencode",
       "spec": "opencode.spec",
       "upstream_url": "https://github.com/anomalyco/opencode.git",
-      "tag_prefix": "v"
+      "tag_prefix": "v",
+      "version_source": "github_release"
     },
     {
       "chroot_arches": ["aarch64", "x86_64"],
