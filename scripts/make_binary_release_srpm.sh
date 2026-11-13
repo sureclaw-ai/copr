@@ -100,11 +100,18 @@ curl_download() {
   done
 }
 
+# Default to GitHub release assets; allow an override for projects that publish
+# their prebuilt binaries elsewhere. The template may contain {version} and {tag}
+# placeholders, substituted once the version/tag are known.
+release_download_base_url="${RELEASE_DOWNLOAD_BASE_URL:-https://github.com/${repo_path}/releases/download/${tag}}"
+release_download_base_url=$(printf '%s' "$release_download_base_url" | sed -e "s|{version}|${version}|g" -e "s|{tag}|${tag}|g")
+release_download_base_url="${release_download_base_url%/}"
+
 download_release_asset() {
   asset_name="$1"
   output_name="$2"
   output_path="${sources_dir}/${output_name}"
-  direct_url="https://github.com/${repo_path}/releases/download/${tag}/${asset_name}"
+  direct_url="${release_download_base_url}/${asset_name}"
   curl_download "${direct_url}" "${output_path}"
 }
 
