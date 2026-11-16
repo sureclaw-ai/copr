@@ -66,6 +66,15 @@ jobs:
           done
 
       - name: Detect upstream version
+        env:
+          # check_upstream.py queries api.github.com/releases/latest for
+          # packages using version_source=github_release (e.g. codex). Without
+          # a token these requests are unauthenticated and share the 60/hour
+          # per-IP limit across all jobs on the GitHub-hosted runner pool,
+          # which routinely trips "HTTP Error 403: rate limit exceeded" and
+          # fails the whole run. The built-in GITHUB_TOKEN raises the limit to
+          # 5000/hour; the script already sends it as a Bearer header when set.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           uv run scripts/check_upstream.py \
