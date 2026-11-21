@@ -13,7 +13,7 @@
 %global __requires_exclude_from ^%{_prefix}/lib/composio/.*$
 
 Name:           composio
-Version:        0.6.2
+Version:        0.6.3
 Release:        1%{?dist}
 Summary:        Composio CLI for connecting AI agents to external tools
 
@@ -80,6 +80,9 @@ ln -s %{_prefix}/lib/composio/composio %{buildroot}%{_bindir}/composio
 %{_prefix}/lib/composio/
 
 %changelog
+* Sat Nov 21 2026 Codex Automation <noreply@users.noreply.github.com> - 0.6.3-1
+- Update to v0.6.3
+
 * Tue Nov 17 2026 Codex Automation <noreply@users.noreply.github.com> - 0.6.2-1
 - Update to v0.6.2
 
