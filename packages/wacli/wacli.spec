@@ -2,7 +2,7 @@
 
 Name:           wacli
 Version:        0.26.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        WhatsApp CLI for sync, search, and send
 
 License:        MIT
@@ -11,7 +11,7 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
 BuildRequires:  gcc
-BuildRequires:  golang >= 1.25
+BuildRequires:  golang >= 1.26
 ExclusiveArch:  aarch64 x86_64
 
 %description
@@ -45,6 +45,12 @@ install -Dpm0755 wacli %{buildroot}%{_bindir}/wacli
 %{_bindir}/wacli
 
 %changelog
+* Sat Nov 22 2026 COPR Packaging <noreply@users.noreply.github.com> - 0.26.1-2
+- Pin the Go language version to 1.26 via GO_VERSION_COMPAT and require golang >= 1.26.
+  Upstream go.mod now declares "go 1.27.0", which the SRPM builder's Go (and the
+  dependency go.mau.fi/whatsmeow's own "go >= 1.26" requirement) could not satisfy,
+  breaking source import (SRPM generation) on every chroot.
+
 * Tue Nov 17 2026 Codex Automation <noreply@users.noreply.github.com> - 0.26.1-1
 - Update to v0.26.1
 
