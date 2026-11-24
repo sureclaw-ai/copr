@@ -111,7 +111,14 @@ download_release_asset() {
 download_release_asset "${release_asset_x86_64}" "${release_source_x86_64}"
 download_release_asset "${release_asset_aarch64}" "${release_source_aarch64}"
 
-git clone --depth 1 --branch "${tag}" "${upstream_url}" "${srcdir}"
+# Only the doc files are needed from the upstream tree. A full checkout of
+# large upstream monorepos (e.g. opencode: ~250 MB working tree) on top of
+# the already-large release tarballs can exhaust the Copr srpm-builder's
+# disk and fail the SRPM build before it starts. Fetch just the doc files
+# with a blobless, sparse checkout to keep the builder footprint small.
+git clone --depth 1 --branch "${tag}" --filter=blob:none --no-checkout "${upstream_url}" "${srcdir}"
+git -C "${srcdir}" sparse-checkout set --no-cone ${doc_files}
+git -C "${srcdir}" checkout
 for doc_file in ${doc_files}; do
   cp "${srcdir}/${doc_file}" "${docsdir}/"
 done
