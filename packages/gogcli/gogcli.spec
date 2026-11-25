@@ -2,7 +2,7 @@
 
 Name:           gogcli
 Version:        0.48.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Google Workspace CLI for the terminal
 
 License:        MIT
@@ -10,7 +10,23 @@ URL:            https://github.com/openclaw/gogcli
 Source0:        %{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.gz
 
+# gogcli's go.mod requires "go 1.26.0" (several dependencies pull the minimum up
+# to 1.26, so the GO_VERSION_COMPAT rewrite in make_srpm.sh is restored by
+# "go mod tidy" and cannot lower it). openSUSE patches Go to default
+# GOTOOLCHAIN=local, so a build cannot fetch a newer toolchain over the (offline)
+# network: when only the default "go" (which can lag at 1.25 on Leap 16.0) is
+# installed, the build fails with
+#   go.mod requires go >= 1.26.0 (running go 1.25.x; GOTOOLCHAIN=local)
+# On openSUSE, require a versioned Go >= 1.26 (the go1.26/go1.27 packages provide
+# golang(API); the bare "golang" symbol only comes from the floating metapackage,
+# which may still be 1.25). update-alternatives then points /usr/bin/go at it.
+# Other distros build with GOTOOLCHAIN=auto and already ship go >= 1.26, so leave
+# their requirement unchanged.
+%if 0%{?suse_version}
+BuildRequires:  golang(API) >= 1.26
+%else
 BuildRequires:  golang >= 1.25
+%endif
 ExclusiveArch:  aarch64 x86_64
 
 %description
@@ -51,6 +67,13 @@ install -Dpm0755 gog %{buildroot}%{_bindir}/gog
 %{_bindir}/gog
 
 %changelog
+* Wed Nov 25 2026 matt haigh <matthaigh27@gmail.com> - 0.48.1-2
+- Fix build failure on openSUSE Leap 16.0 (both arches). go.mod requires
+  go >= 1.26.0, but Leap defaults GOTOOLCHAIN=local and its default "go" can
+  lag at 1.25, so the build failed with "go.mod requires go >= 1.26.0
+  (running go 1.25.x; GOTOOLCHAIN=local)". On openSUSE, BuildRequire a
+  versioned Go >= 1.26 via golang(API); other chroots are unchanged.
+
 * Tue Nov 17 2026 Codex Automation <noreply@users.noreply.github.com> - 0.48.1-1
 - Update to v0.48.1
 
