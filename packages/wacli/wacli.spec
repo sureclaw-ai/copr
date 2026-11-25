@@ -2,7 +2,7 @@
 
 Name:           wacli
 Version:        0.26.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        WhatsApp CLI for sync, search, and send
 
 License:        MIT
@@ -45,6 +45,12 @@ install -Dpm0755 wacli %{buildroot}%{_bindir}/wacli
 %{_bindir}/wacli
 
 %changelog
+* Tue Nov 25 2026 matt haigh <matthaigh27@gmail.com> - 0.26.1-2
+- Set GO_VERSION_COMPAT=1.25 so the SRPM rewrites upstream's "go 1.27.0"
+  directive down to 1.25, matching the golang >= 1.25 BuildRequires. Fixes
+  "go.mod requires go >= 1.27.0 (GOTOOLCHAIN=local)" build failures on all
+  chroots.
+
 * Tue Nov 17 2026 Codex Automation <noreply@users.noreply.github.com> - 0.26.1-1
 - Update to v0.26.1
 
