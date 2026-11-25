@@ -2,7 +2,7 @@
 
 Name:           opencode
 Version:        2.4.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Open source AI coding agent for the terminal
 
 License:        MIT
@@ -38,6 +38,11 @@ install -Dpm0755 opencode %{buildroot}%{_bindir}/opencode
 %{_bindir}/opencode
 
 %changelog
+* Wed Nov 25 2026 matt haigh <matthaigh27@gmail.com> - 2.4.1-2
+- Track upstream via published GitHub releases instead of git tags so COPR only
+  builds versions whose prebuilt binary assets have been uploaded (fixes the
+  SRPM step failing with 404s on assets that do not exist yet)
+
 * Tue Nov 24 2026 Codex Automation <noreply@users.noreply.github.com> - 2.4.1-1
 - Update to v2.4.1
 
